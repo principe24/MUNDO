@@ -46,3 +46,23 @@ la lista de favoritos del propietario.
   producción o aporten valor a cada cambio pequeño.
 - Conservar las reglas previas de revisión antes de incorporar/publicar y los
   respaldos completos acumulados, con Studio en una parte separada.
+
+## Comunicación de seguridad y respaldos
+
+Instrucción expresa del propietario del 15 de noviembre de 2026:
+
+- Al trabajar o responder sobre seguridad de MUNDO, indicar el nombre exacto del
+  repositorio/componente utilizado y explicar qué protección aporta al cambio.
+  Distinguir el componente del código propio que realiza la validación,
+  autorización o cifrado. Cuando una protección sea implementación propia,
+  decirlo; no atribuirla a un favorito que no la proporciona.
+- Señalar el alcance real: propuesta, prueba local o servicio activo. Por
+  ejemplo, Colyseus aporta infraestructura multijugador y OpenTelemetry aporta
+  diagnóstico; eso no demuestra por sí solo cifrado o permisos correctos.
+- En cada entrega de una actualización, proporcionar respaldo COMPLETO y
+  acumulado de MUNDO y otro completo de MUNDO Studio en una parte separada, como
+  en la entrega P50. Conservar respaldos previos, historia, fuente, recursos,
+  versiones/licencias de dependencias, compilación disponible, migraciones,
+  pruebas, continuidad y mundos/progreso exportados disponibles.
+- No sustituir esos respaldos por parches o archivos sueltos; preservar los
+  originales y no afirmar acceso a datos guardados únicamente en otro equipo.

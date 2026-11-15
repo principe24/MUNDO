@@ -47,15 +47,16 @@ la lista de favoritos del propietario.
 - Conservar las reglas previas de revisión antes de incorporar/publicar y los
   respaldos completos acumulados, con Studio en una parte separada.
 
-## Comunicación de seguridad y respaldos
+## Comunicación general y respaldos del proyecto y del chat
 
 Instrucción expresa del propietario del 15 de noviembre de 2026:
 
-- Al trabajar o responder sobre seguridad de MUNDO, indicar el nombre exacto del
-  repositorio/componente utilizado y explicar qué protección aporta al cambio.
-  Distinguir el componente del código propio que realiza la validación,
-  autorización o cifrado. Cuando una protección sea implementación propia,
-  decirlo; no atribuirla a un favorito que no la proporciona.
+- La atribución de repositorios se aplica EN GENERAL a todo el trabajo de MUNDO
+  y Studio, no solo a seguridad: gráficos, avatar, movimiento, física, red,
+  navegación, activos, herramientas, optimización, diagnóstico y demás cambios.
+  Indicar brevemente el repositorio/componente realmente utilizado, para qué
+  sirve en ese cambio y qué parte es código propio. No inventar el uso de una
+  biblioteca ni atribuirle funciones que no proporciona.
 - Señalar el alcance real: propuesta, prueba local o servicio activo. Por
   ejemplo, Colyseus aporta infraestructura multijugador y OpenTelemetry aporta
   diagnóstico; eso no demuestra por sí solo cifrado o permisos correctos.
@@ -66,3 +67,11 @@ Instrucción expresa del propietario del 15 de noviembre de 2026:
   pruebas, continuidad y mundos/progreso exportados disponibles.
 - No sustituir esos respaldos por parches o archivos sueltos; preservar los
   originales y no afirmar acceso a datos guardados únicamente en otro equipo.
+- Incluir además el respaldo del CHAT: conservar todos los mensajes de usuario,
+  respuestas y actualizaciones visibles que se puedan recuperar, más los
+  registros anteriores intactos. Distinguir siempre la transcripción literal
+  de los resúmenes y notas de continuidad. Señalar el corte temporal y cualquier
+  tramo no recuperable; no fabricar mensajes ni llamar completo a un resumen.
+- Mantener la conversación privada en los respaldos del propietario, separada
+  del código. Pedir autorización específica antes de subir el chat a GitHub u
+  otro destino externo; guardar una regla de trabajo no autoriza ese envío.

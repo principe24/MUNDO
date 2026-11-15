@@ -1,0 +1,19 @@
+{
+  "format": "mundo-owner-starred-repositories/1",
+  "confirmedAt": "2026-11-15",
+  "owner": "principe24",
+  "project": "principe24/MUNDO",
+  "instruction": "Considerar siempre los nueve favoritos como conjunto técnico al trabajar en MUNDO; buscar en sus fuentes oficiales según el rol de la petición y reutilizar las integraciones existentes.",
+  "count": 9,
+  "repositories": [
+    {"name":"mrdoob/three.js","url":"https://github.com/mrdoob/three.js","role":"render-materials-animation-loaders","version":"0.160.0","paths":["public/vendor/three.min.js","public/game.js","public/avatar-model.js","tools/engine/geometry.mjs","tools/engine/texture.mjs"],"state":"existing-renderer-and-tested-scene-pipeline"},
+    {"name":"godotengine/godot","url":"https://github.com/godotengine/godot","role":"studio-scene-interchange-and-inspection","version":"4.6.3-stable","paths":["tools/engine/godot/","tools/engine/godot-check.mjs"],"state":"tested-offline-scene-import-not-gameplay-migration"},
+    {"name":"dimforge/rapier","url":"https://github.com/dimforge/rapier","role":"physics-and-collisions","version":"0.21.0","paths":["tools/engine/physics.mjs","tools/engine/inspect.mjs"],"state":"tested-preflight-and-fixed-step-rigid-body-not-actor-migration"},
+    {"name":"colyseus/colyseus","url":"https://github.com/colyseus/colyseus","role":"authoritative-multiplayer-and-state-sync","version":"core-0.18.28","paths":["services/realtime/","tools/engine/realtime.mjs"],"state":"tested-loopback-service-with-two-real-sdk-clients"},
+    {"name":"isaac-mason/recast-navigation-js","url":"https://github.com/isaac-mason/recast-navigation-js","role":"navmesh-and-pathfinding","version":"0.44.0","paths":["tools/engine/navigation.mjs","tools/engine/inspect.mjs"],"state":"tested-walking-navmesh-and-serialization-not-jump-certification"},
+    {"name":"donmccurdy/glTF-Transform","url":"https://github.com/donmccurdy/glTF-Transform","role":"gltf-validation-and-transformation","version":"4.5.1","paths":["tools/assets/","tools/engine/geometry.mjs","tools/engine/review.mjs"],"state":"tested-offline-glb-pipeline"},
+    {"name":"zeux/meshoptimizer","url":"https://github.com/zeux/meshoptimizer","role":"geometry-optimization","version":"1.3.0","paths":["tools/assets/optimize.mjs"],"state":"tested-non-lossy-index-and-vertex-reordering"},
+    {"name":"BinomialLLC/basis_universal","url":"https://github.com/BinomialLLC/basis_universal","role":"texture-compression-and-transcoding","commit":"073eb6a0a34a23d77e75e54f41dcd9653a52da83","paths":["tools/engine/texture.mjs","tools/engine/build-basis.mjs","tools/engine/upstreams.json"],"state":"tested-upstream-encoder-and-pinned-three-decoder"},
+    {"name":"open-telemetry/opentelemetry-js","url":"https://github.com/open-telemetry/opentelemetry-js","role":"instrumentation-and-diagnostics","version":"sdk-trace-3.1.1","paths":["tools/engine/telemetry.mjs","tools/engine/realtime.mjs"],"state":"tested-bounded-local-records-disabled-by-default-no-exporter"}
+  ]
+}

@@ -87,7 +87,7 @@ function pluginDatabase(persisted) {
   };
 }
 
-function mount(persisted, {pagePath = process.argv[2] || path.join(__dirname, "../../studio/Mundos.html"), modelDatabase} = {}) {
+function mount(persisted, {pagePath = process.argv[2] || path.join(__dirname, "../../studio/Mundos.html"), modelDatabase, audioDatabase, audioHost} = {}) {
   const {html, scripts} = readPage(pagePath);
   let download;
   const fields = new Map();
@@ -191,21 +191,21 @@ function mount(persisted, {pagePath = process.argv[2] || path.join(__dirname, ".
   const block = new Element("button");
   block.dataset.shape = "1";
   const element = id => fields.get(id) || null;
-  const document = {
-    addEventListener() {},
+  const document = Object.assign(new EventTarget(), {
     getElementById: element,
     createElement: tag => new Element(tag),
     createDocumentFragment: () => new Element("fragment"),
     querySelectorAll: query => query === "[data-shape]" ? [block] : [],
     body: new Element("body"),
-  };
+  });
   const plugins = pluginDatabase(persisted);
   const indexedDB = {open(name, version) {
+    if (audioDatabase && audioDatabase.name === name) return audioDatabase.open(name, version);
     if (modelDatabase && name === "mundo-studio-creator-meshes") return modelDatabase.open(name, version);
     return plugins.open(name, version);
   }};
   const context = vm.createContext({
-    document, Option, indexedDB,
+    document, Option, indexedDB, ...audioHost,
     navigator: {userAgent: "Studio QA", platform: "Linux"},
     addEventListener: (name, callback) => events.set(name, callback),
     URL, Blob, TextEncoder, TextDecoder, atob, btoa, Uint8Array, crypto: webcrypto,
@@ -215,7 +215,7 @@ function mount(persisted, {pagePath = process.argv[2] || path.join(__dirname, ".
   });
   context.window = context;
   for (const {code, name} of scripts) vm.runInContext(code, context, {filename: name});
-  return {element, block, events, getDownload: () => download};
+  return {element, block, events, document, getDownload: () => download};
 }
 
 async function manifestOf(blob) {

@@ -100,6 +100,17 @@ window.MundoStudioAudioPanel = function({world, edit, redraw, camera, mark, canc
     return scene.read(preview)[0];
   }
 
+  const levels = [["audioMaster",null],["audioAmbience","ambiente"],["audioEffects","efectos"],["audioMusic","musica"],["audioVoices","voces"]];
+  function setLevel(id, group) {
+    if (!active) return;
+    const input = get(id);
+    if (!input.validity.valid) return;
+    const level = input.valueAsNumber / 100;
+    if (group) active.output.setGroupVolume(group,level);
+    else active.output.setVolume(level);
+  }
+  for (const [id,group] of levels) get(id).oninput = () => setLevel(id,group);
+
   function moveListener() {
     if (active?.mode !== "mix") return;
     const pose = camera();
@@ -150,6 +161,7 @@ window.MundoStudioAudioPanel = function({world, edit, redraw, camera, mark, canc
     try {
       run = {mode, output:MundoAudioOutput.create(), ticket:0, loaded:new Set()};
       active = run;
+      for (const [id,group] of levels) setLevel(id,group);
       get("audioStop").disabled = false;
       status.textContent = "Abriendo salida de audio…";
       // Carry the click directly into unlock before any asynchronous local catalog lookup.

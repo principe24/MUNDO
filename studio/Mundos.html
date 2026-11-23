@@ -237,7 +237,7 @@
         <div class="actions"><label>Alcance (m)<input id="audioRadius" type="number" min="0.5" max="256" step="0.01" value="12"></label><label>Volumen (%)<input id="audioVolume" type="number" min="0" max="100" step="0.1" value="65"></label></div>
         <label for="audioWav">Importar WAV al catálogo privado</label><input id="audioWav" type="file" accept=".wav,audio/wav">
         <div class="actions"><label>Espacio<select id="audioSpatial"><option value="3d">3D · en el mundo</option><option value="2d">2D · sin distancia</option></select></label>
-          <label>Grupo<select id="audioGroup"><option value="ambiente">Ambiente</option><option value="efectos">Efectos</option><option value="musica">Música</option></select></label></div>
+          <label>Grupo<select id="audioGroup"><option value="ambiente">Ambiente</option><option value="efectos">Efectos</option><option value="musica">Música</option><option value="voces">Voces</option></select></label></div>
         <div class="actions"><label>Reproducción<select id="audioLoop"><option value="loop">En bucle</option><option value="once">Una vez</option></select></label>
           <label>Velocidad (×)<input id="audioRate" type="number" min="0.25" max="4" step="0.01" value="1"></label></div>
         <fieldset><legend>Posición de la fuente (m)</legend>
@@ -246,6 +246,10 @@
         </fieldset>
         <div class="actions"><button type="button" id="audioCreate">Crear fuente</button><button type="button" id="audioApply">Guardar cambios</button><button type="button" id="audioCopy">Duplicar</button><button type="button" id="audioRemove">Quitar</button></div>
         <div class="actions"><button type="button" id="audioSolo">Escuchar fuente</button><button type="button" id="audioMix">Escuchar mezcla guardada desde la cámara</button><button type="button" id="audioStop">Detener</button></div>
+        <details><summary>Niveles de escucha en Studio</summary>
+          <div class="actions"><label>General (%)<input id="audioMaster" type="number" min="0" max="100" value="100"></label><label>Ambiente (%)<input id="audioAmbience" type="number" min="0" max="100" value="100"></label></div>
+          <div class="actions"><label>Efectos (%)<input id="audioEffects" type="number" min="0" max="100" value="100"></label><label>Música (%)<input id="audioMusic" type="number" min="0" max="100" value="100"></label><label>Voces (%)<input id="audioVoices" type="number" min="0" max="100" value="100"></label></div>
+        </details>
         <button type="button" id="audioExport">Exportar sala con los sonidos seleccionados (.mroomaudio)</button>
         <p>Al exportar autorizas incluir los archivos de audio usados en este mundo. Los demás sonidos se quedan en tu catálogo.</p>
         <p id="audioStatus" role="status" aria-live="polite"></p>

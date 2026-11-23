@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 // Only the two model stores, their transaction commit/abort, and origin reopening
 // are simulated. All importer, binary, hash, and model catalog logic is production code.
-function memoryDatabase(data) {
+function memoryDatabase(data, databaseName="mundo-studio-creator-meshes") {
   const clone=value=>structuredClone(value);
   function transaction(names, mode="readonly") {
     const snapshot=clone(data.stores);
@@ -36,7 +36,7 @@ function memoryDatabase(data) {
   return {open(name,version) {
     const request={};
     queueMicrotask(() => {
-      assert.equal(name,"mundo-studio-creator-meshes");
+      assert.equal(name,databaseName);
       request.result={transaction,close(){},createObjectStore(key) {
         assert(!data.stores.has(key)); data.stores.set(key,new Map());
       }};

@@ -13,9 +13,9 @@ globalThis.MundoAudioClips = (() => {
   const ascii=(b,at,s)=>{for(let i=0;i<s.length;i++)b[at+i]=s.charCodeAt(i);};
   const hex=b=>Array.from(b,n=>n.toString(16).padStart(2,"0")).join("");
   const keyOf=digest=>"s"+digest.slice(0,16);
-  function layout(input){
+  function layout(input,limits={bytes:16*1024*1024,seconds:16}){
     const b=bin(input), v=new DataView(b.buffer,b.byteOffset,b.byteLength);
-    check(b.length>=44 && b.length<=16*1024*1024 && txt(b,0,4)==="RIFF" &&
+    check(b.length>=44 && b.length<=limits.bytes && txt(b,0,4)==="RIFF" &&
       v.getUint32(4,true)===b.length-8 && txt(b,8,4)==="WAVE","El archivo debe ser un WAV RIFF completo.");
     let fmt=null, data=null, at=12;
     while(at<b.length){
@@ -39,11 +39,12 @@ globalThis.MundoAudioClips = (() => {
       stride===bits/8*channels && byteRate===sampleRate*stride && data.size%stride===0,
       "Usa WAV PCM mono o estéreo de 8 a 96 kHz.");
     const frames=data.size/stride;
-    check(frames>0 && frames<=sampleRate*16,"Cada grabación admite hasta 16 segundos.");
+    check(frames>0 && frames<=sampleRate*limits.seconds,
+      limits.seconds===16?"Cada grabación admite hasta 16 segundos.":"La pista musical supera el tiempo admitido.");
     return {v,fmt,data,frames};
   }
-  function decode(input){
-    const {v,fmt,data,frames}=layout(input), samples=new Float32Array(frames);
+  function decode(input,limits){
+    const {v,fmt,data,frames}=layout(input,limits), samples=new Float32Array(frames);
     let at=data.at;
     for(let i=0;i<frames;i++){
       let sum=0;
@@ -112,6 +113,19 @@ globalThis.MundoAudioClips = (() => {
     const source=decode(input),bytes=encodeMono(resample(source.samples,source.sampleRate)),hash=await digest(bytes);
     return {key:keyOf(hash),digest:hash,bytes};
   }
+  async function prepareMusic(input){
+    const source=decode(input,{bytes:64*1024*1024,seconds:960});
+    const samples=resample(source.samples,source.sampleRate), segmentFrames=rate*12, segments=[];
+    check(samples.length<=rate*960,"La pista musical admite hasta 16 minutos.");
+    for(let at=0;at<samples.length;at+=segmentFrames){
+      const bytes=encodeMono(samples.subarray(at,Math.min(samples.length,at+segmentFrames)));
+      const hash=await digest(bytes);
+      segments.push({index:segments.length,key:keyOf(hash),digest:hash,bytes});
+    }
+    const manifest=new TextEncoder().encode("MUNDO/music/v1\n"+segments.map(item=>item.digest).join("\n")+"\n");
+    const hash=await digest(manifest), raw=BigInt("0x"+hash.slice(0,16));
+    return {id:String(raw||1n),digest:hash,segments};
+  }
   async function verify(key,input,expected){
     // The caller may edit or recycle the input while the asynchronous digest runs.
     const bytes=new Uint8Array(canonical(input)), hash=await digest(bytes);
@@ -170,6 +184,6 @@ globalThis.MundoAudioClips = (() => {
     const keys=new Set(sources.map(s=>s.preset).filter(p=>/^s[0-9a-f]{16}$/.test(p)));
     check(keys.size===items.length && items.every(item=>keys.delete(item.key)) && keys.size===0,"Las grabaciones deben corresponder exactamente a las fuentes de la sala.");
   }
-  return Object.freeze({decode,canonical,encodeMono,prepare,verify,pack,unpack,packProjectBank,unpackProjectBank,match,hasModels,maxClipBytes,maxRoomBytes,maxBankBytes,rate});
+  return Object.freeze({decode,canonical,encodeMono,prepare,prepareMusic,verify,digest,pack,unpack,packProjectBank,unpackProjectBank,match,hasModels,maxClipBytes,maxRoomBytes,maxBankBytes,rate});
 })();
 if(typeof module!=="undefined" && module.exports)module.exports=globalThis.MundoAudioClips;

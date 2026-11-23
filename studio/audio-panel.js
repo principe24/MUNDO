@@ -9,6 +9,15 @@ window.MundoStudioAudioPanel = function({world, edit, redraw, camera, mark, canc
   const presets = get("audioPreset");
   let sources = [], active = null, catalog = [], catalogTicket = 0;
 
+  function refreshMusic(){
+    const music=scene.readMusic(world());
+    get("audioMusicName").value=music?.label||"Música del mundo";
+    get("audioMusicLoop").value=music?.loop===false?"once":"loop";
+    get("audioMusicApply").disabled=get("audioMusicRemove").disabled=!music;
+    get("audioMusicStatus").textContent=music?
+      "Pista "+music.streamId+" vinculada a este mundo.":"Este mundo no tiene música larga.";
+  }
+
   function showPresets(preferred) {
     const options = [new Option("Brisa","brisa"), new Option("Agua","agua"), new Option("Máquina","maquina")];
     for (const entry of catalog) options.push(new Option(entry.name + " · " + entry.key,entry.key));
@@ -74,6 +83,7 @@ window.MundoStudioAudioPanel = function({world, edit, redraw, camera, mark, canc
     list.replaceChildren(new Option("Nueva fuente", ""), ...sources.map(s => new Option(s.label + " · " + s.id, s.id)));
     list.value = sources.some(s => s.id === String(id)) ? String(id) : "";
     fill();
+    refreshMusic();
     status.textContent = sources.length + " de " + scene.maxSources + " fuentes.";
   }
 
@@ -222,6 +232,34 @@ window.MundoStudioAudioPanel = function({world, edit, redraw, camera, mark, canc
       updateSolo();
       status.textContent = "Sonido importado. Guarda la fuente para usarlo en este mundo.";
     } catch (error) { if (start === world()) status.textContent = error.message; }
+  };
+  get("audioMusicWav").onchange=async event=>{
+    const file=event.target.files[0];event.target.value="";
+    if(!file)return;
+    const start=world();
+    get("audioMusicStatus").textContent="Preparando segmentos de la pista…";
+    try{
+      const item=await MundoAudioLibrary.importMusicFile(file);
+      if(start!==world())return;
+      const label=(get("audioMusicName").value.trim()||item.name).slice(0,32);
+      const loop=get("audioMusicLoop").value==="loop";
+      const error=edit(copy=>scene.setMusic(copy,{streamId:item.id,label,loop}),"Música larga vinculada.");
+      if(error)throw error;
+      refresh();redraw();
+      get("audioMusicStatus").textContent="Pista segmentada en "+item.segments+" partes y vinculada al mundo.";
+    }catch(error){if(start===world())get("audioMusicStatus").textContent=error.message;}
+  };
+  get("audioMusicApply").onclick=()=>{
+    const prior=scene.readMusic(world());if(!prior)return;
+    const error=edit(copy=>scene.setMusic(copy,{streamId:prior.streamId,label:get("audioMusicName").value.trim(),
+      loop:get("audioMusicLoop").value==="loop"}),"Ajustes de música guardados.");
+    if(error)get("audioMusicStatus").textContent=error.message;
+    else{refresh();redraw();}
+  };
+  get("audioMusicRemove").onclick=()=>{
+    const error=edit(copy=>scene.removeMusic(copy),"Música larga retirada.");
+    if(error)get("audioMusicStatus").textContent=error.message;
+    else{refresh();redraw();}
   };
   panel.ontoggle = () => { if (!panel.open) { stop(); cancelMark(); } else reloadCatalog(); redraw(); };
   document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); });

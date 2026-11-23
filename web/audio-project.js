@@ -10,16 +10,17 @@ globalThis.MundoAudioProject = (() => {
   const maxBytes = 16+64*1024*1024+clips.maxBankBytes+36*16;
 
   async function inventory(index) {
-    const sourcesByWorld = new Map(), names = new Map();
+    const sourcesByWorld = new Map(), names = new Map();let hasMusic=false;
     for (const entry of index.worlds) {
-      const sources = scene.read((await P.load(entry)).world);
+      const world=(await P.load(entry)).world,sources=scene.read(world);
+      hasMusic ||= Boolean(scene.readMusic(world));
       sourcesByWorld.set(entry.id,sources);
       for (const source of sources) {
         if (scene.isClip(source.preset) && !names.has(source.preset)) names.set(source.preset,source.label);
       }
       if (names.size > 16) throw Error("El proyecto admite hasta 16 grabaciones distintas.");
     }
-    return {sourcesByWorld,names};
+    return {sourcesByWorld,names,hasMusic};
   }
 
   async function inspect(project) {
@@ -29,7 +30,9 @@ globalThis.MundoAudioProject = (() => {
     const guest = new Uint8Array(await (await P.packForRoom(index)).arrayBuffer());
     if (guest.length !== project.length || !guest.every((byte,i) => byte===project[i]))
       throw Error("Exporta una copia para invitados antes de incluir las grabaciones.");
-    return {index,...await inventory(index)};
+    const details=await inventory(index);
+    if(details.hasMusic)throw Error("La música larga de proyectos requiere el siguiente formato de publicación.");
+    return {index,...details};
   }
 
   function unpack(input) {
@@ -64,7 +67,8 @@ globalThis.MundoAudioProject = (() => {
     // Capture immutable entries, portal definitions and the title before the first await.
     const blob = await P.packForRoom(index);
     const guest = await P.open(blob);
-    const {names} = await inventory(guest);
+    const {names,hasMusic} = await inventory(guest);
+    if(hasMusic)throw Error("La exportación de música larga para proyectos sigue pendiente. Exporta una sala musical individual.");
     if (!names.size) return {blob,hasAudio:false};
     if (!getClip) throw Error("Autoriza las grabaciones referenciadas para preparar este proyecto.");
     const items = [];

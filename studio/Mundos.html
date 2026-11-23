@@ -201,7 +201,7 @@
           </div>
         </details>
         <button id="shareWorld" class="full" hidden>Compartir archivo .mworld</button>
-        <input type="file" id="inputFile" accept=".mworld,.mroom,.mroom3d,.mroomaudio" hidden>
+        <input type="file" id="inputFile" accept=".mworld,.mroom,.mroom3d,.mroomaudio,.mroommusic" hidden>
       </section>
       <section><details id="navPanel"><summary>Personajes y rutas a pie</summary>
         <fieldset><legend>Posición en la escena</legend>
@@ -236,6 +236,13 @@
         <label for="audioPreset">Sonido</label><select id="audioPreset"><option value="brisa">Brisa</option><option value="agua">Agua</option><option value="maquina">Máquina</option></select>
         <div class="actions"><label>Alcance (m)<input id="audioRadius" type="number" min="0.5" max="256" step="0.01" value="12"></label><label>Volumen (%)<input id="audioVolume" type="number" min="0" max="100" step="0.1" value="65"></label></div>
         <label for="audioWav">Importar WAV al catálogo privado</label><input id="audioWav" type="file" accept=".wav,audio/wav">
+        <fieldset><legend>Música larga del mundo</legend>
+          <label for="audioMusicName">Nombre visible</label><input id="audioMusicName" maxlength="32" value="Música del mundo">
+          <label for="audioMusicWav">Importar pista WAV de hasta 16 minutos</label><input id="audioMusicWav" type="file" accept=".wav,audio/wav">
+          <label>Final de la pista<select id="audioMusicLoop"><option value="loop">Repetir desde el inicio</option><option value="once">Terminar una vez</option></select></label>
+          <div class="actions"><button type="button" id="audioMusicApply">Guardar ajustes</button><button type="button" id="audioMusicRemove">Quitar música larga</button></div>
+          <p id="audioMusicStatus" role="status" aria-live="polite"></p>
+        </fieldset>
         <div class="actions"><label>Espacio<select id="audioSpatial"><option value="3d">3D · en el mundo</option><option value="2d">2D · sin distancia</option></select></label>
           <label>Grupo<select id="audioGroup"><option value="ambiente">Ambiente</option><option value="efectos">Efectos</option><option value="musica">Música</option><option value="voces">Voces</option></select></label></div>
         <div class="actions"><label>Reproducción<select id="audioLoop"><option value="loop">En bucle</option><option value="once">Una vez</option></select></label>
@@ -466,5 +473,5 @@
   <script src="vehicle-model.js"></script>
   <script src="patio-template.js"></script>
   <script src="../web/course-timing.js"></script><script src="course-timing-panel.js"></script>
-  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="../web/navigation-3d.js"></script><script src="npc-preflight.js"></script><script src="npc-panel.js"></script><script src="../web/audio-scene.js"></script><script src="../web/audio-clips.js"></script><script src="../web/audio-project.js"></script><script src="../web/audio-library.js"></script><script src="../web/audio-dsp.js"></script><script src="../web/audio-output.js"></script><script src="audio-panel.js"></script><script src="editor.js"></script>
+  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="../web/navigation-3d.js"></script><script src="npc-preflight.js"></script><script src="npc-panel.js"></script><script src="../web/audio-scene.js"></script><script src="../web/audio-clips.js"></script><script src="../web/audio-music.js"></script><script src="../web/audio-project.js"></script><script src="../web/audio-library.js"></script><script src="../web/audio-dsp.js"></script><script src="../web/audio-output.js"></script><script src="audio-panel.js"></script><script src="editor.js"></script>
 </body></html>

@@ -6,7 +6,7 @@
   if(!trial && invite===null)return;
   const inRoom=!trial;
   const audio=window.MundoPlayerAudio?.create(window,MundoView.mobile);
-  let roomClips=null;
+  let roomClips=null,roomMusic=null;
   function audioForm(settings){
     if(!audio || !settings)return;
     el("audioVolume").value=settings.volume;
@@ -77,7 +77,7 @@
     if(courseClock.textContent!==clock)courseClock.textContent=clock;
   }
   function coverScene(){
-    audio?.setActive(false);roomClips?.pause();
+    audio?.setActive(false);roomClips?.pause();roomMusic?.pause();
     clearNpcs();
     displayCourse(null);
     canvas.parentElement.classList.add("awaiting-room");
@@ -522,6 +522,8 @@
     link=new MundoRoomLink(invite,proof);
     if(audio)roomClips=MundoPlayerAudio.roomClips(link,audio,window.MundoAudioClips,mundoRoomBytes,
       message=>{el("audioClipStatus").textContent=message;});
+    if(audio)roomMusic=MundoPlayerAudio.roomMusic(link,audio,window.MundoAudioClips,mundoRoomBytes,
+      message=>{el("audioClipStatus").textContent=message;});
     const roomModels=MundoRoomModels(view,link,message=>{el("modelNotice").textContent=message;});
     const status=message=>{el("notice").textContent=message;};
     let active=false,generation=0,timer=null,pending=Promise.resolve(),peers=-1;
@@ -667,7 +669,7 @@
       cars=available;changeRoomTerrain(geometry,terrain);
     }
     function clearRoom(){
-      roomClips?.clear();audio?.clear();
+      roomClips?.clear();roomMusic?.clear();audio?.clear();
       roomModels.clear();
       coverScene();suspendRoomTerrain();roomResidence=null;el("world").textContent="Sala privada";
       guideToCar(null,null);
@@ -725,7 +727,7 @@
         }
       }
       function holdScene(){
-        audio?.setActive(false);roomClips?.pause();
+        audio?.setActive(false);roomClips?.pause();roomMusic?.pause();
         sectorWaiting=false;
         if(!entryView)coverScene();
         suspendRoomTerrain();
@@ -801,7 +803,7 @@
           if(!link.followSector(admission,self,snap.car)){
             lastSnapshot=performance.now();
             if(!sectorWaiting){
-              audio?.setActive(false);roomClips?.pause();
+              audio?.setActive(false);roomClips?.pause();roomMusic?.pause();
               sectorWaiting=true;seatRequest=null;meetingIntent=null;releaseInput();
               if(returnDialog.open)returnDialog.close();
               controls();status("Cargando el terreno de la partida…");
@@ -846,7 +848,7 @@
           const rolledBack=!online && link.project && link.route?.phase===2;
           snapAfterReturn=false;
           lastSnapshot=performance.now();online=true;displayCourse(snap.course);
-          roomClips?.update();audio?.setActive(!document.hidden);
+          roomClips?.update();roomMusic?.update();audio?.setActive(!document.hidden);
           roomModels.update();
           if(ownerPeople)link.roomActor(ownerPeople);
           if(vehicleLook)link.roomBruma(vehicleLook,MundoBrumaLook.isBruma(roomCar?.car));

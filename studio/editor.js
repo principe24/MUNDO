@@ -667,10 +667,10 @@
     const file=e.target.files[0];e.target.value="";if(!file)return;
     const ticket=++queuedRead;
     try{
-      if(!isModel&&/\.mroom(?:3d|audio)?$/i.test(file.name)){
+      if(!isModel&&/\.mroom(?:3d|audio|music)?$/i.test(file.name)){
         const room=await MundoPublications.openRoomFile(file);
         if(room.hasModels)await creatorModels.refreshList();
-        if(room.hasAudio)await audioPanel.reloadCatalog();
+        if(room.hasAudio||room.hasMusic)await audioPanel.reloadCatalog();
         if(ticket!==queuedRead)return;
         install(room.world,room.title,room.vehicleRoot,room.meetingPoint,room.worldSource);
         say("Sala v"+room.revision+" abierta como borrador.");

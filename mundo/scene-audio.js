@@ -60,6 +60,7 @@ globalThis.MundoPlayerAudio = (() => {
       get settings() { return {...settings}; },
       get unlocked() { return unlocked; },
       get clipKeys() { return [...new Set(sources.map(s => s.preset).filter(id => /^s[0-9a-f]{16}$/.test(id)))]; },
+      get bufferedMusicSegments(){return output?.bufferedMusicSegments??(music?.segments.length??0);},
       setClip(key, pcm) { clips.set(key, pcm); output?.setClip(key, pcm); },
       clearClips() { clips.clear(); output?.clearClips(); },
       beginMusicStream(id,firstIndex=0) {
@@ -185,6 +186,74 @@ globalThis.MundoPlayerAudio = (() => {
     }
     return Object.freeze({update, pause, clear});
   }
-  return Object.freeze({create, roomClips});
+  function roomMusic(link,audio,codec,readBytes,report,clock=()=>performance.now()){
+    let scope=null,manifest=null,flight=null,retryAt=0,failures=0,reported="";
+    function status(message){if(message!==reported){reported=message;report(message);}}
+    function admitted(){
+      if(!link.audioMusicOffered||!link.lease||link.project)return null;
+      return link.revision?{revision:link.revision,lease:link.lease}:null;
+    }
+    const same=(a,b)=>a&&b&&a.revision===b.revision&&a.lease===b.lease;
+    function stopFlight(){flight?.abort();flight=null;}
+    function reset(){
+      stopFlight();if(manifest)audio.cancelMusicStream(manifest.id);
+      manifest=null;retryAt=0;failures=0;status("");
+    }
+    function clear(){reset();scope=null;}
+    function pause(){stopFlight();}
+    function fail(ticket,error){
+      if(scope!==ticket)return;
+      failures++;retryAt=[400,403,404,409,410,422].includes(error.status)||failures>=3?Infinity:clock()+2000*failures;
+      status(retryAt===Infinity?"La música larga de esta sala no está disponible.":"Reintentando la música de la sala…");
+    }
+    function parse(text,ticket){
+      if(text.length>7000)throw Object.assign(Error("Inventario musical demasiado grande."),{status:422});
+      const rows=text.split("\n");if(rows.at(-1)==="")rows.pop();
+      const count=Number(rows[3]);
+      if(rows[0]!==ticket.lease||!/^[1-9][0-9]{0,19}$/.test(rows[1])||BigInt(rows[1])>0xffffffffffffffffn||
+         !["loop","once"].includes(rows[2])||!Number.isInteger(count)||count<1||count>80||rows.length!==4+count||
+         rows.slice(4).some(hash=>!/^[a-f0-9]{64}$/.test(hash)))
+        throw Object.assign(Error("Inventario musical inválido."),{status:422});
+      return {id:rows[1],loop:rows[2]==="loop",digests:rows.slice(4),next:0};
+    }
+    function update(){
+      const next=admitted();
+      if(!next){if(scope)clear();return;}
+      if(!same(next,scope)){clear();scope=next;}
+      if(flight||clock()<retryAt)return;
+      const ticket=scope,controller=flight=new AbortController();
+      const current=()=>flight===controller&&scope===ticket&&same(admitted(),ticket);
+      const timeout=setTimeout(()=>controller.abort(),15000);
+      async function work(){
+        if(!manifest){
+          const response=await link.call("music-info",{revision:ticket.revision},null,controller.signal,true);
+          const nextManifest=parse(await response.text(),ticket);
+          if(!current())return;
+          manifest=nextManifest;audio.beginMusicStream(manifest.id,0);failures=0;retryAt=0;status("");
+        }
+        if(audio.bufferedMusicSegments>=2)return;
+        if(manifest.next>=manifest.digests.length){
+          if(audio.bufferedMusicSegments===0&&manifest.loop){audio.beginMusicStream(manifest.id,0);manifest.next=0;}
+          return;
+        }
+        const index=manifest.next,digest=manifest.digests[index],key="s"+digest.slice(0,16);
+        const response=await link.call("music",{lease:ticket.lease,revision:ticket.revision,id:manifest.id,index},null,controller.signal,true);
+        if(response.headers.get("x-mundo-audio-digest")!==digest||response.headers.get("x-mundo-music-index")!==String(index))
+          throw Object.assign(Error("Identidad de segmento musical inválida."),{status:422});
+        const type=response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+        if(type!=="audio/wav"&&type!=="application/octet-stream")throw Object.assign(Error("Tipo de música incompatible."),{status:422});
+        const bytes=await readBytes(response,codec.maxClipBytes,type),pcm=await codec.verify(key,bytes,digest);
+        if(!current()||manifest.next!==index)return;
+        if(audio.queueMusicSegment(manifest.id,index,key,pcm,index===manifest.digests.length-1)){
+          manifest.next++;failures=0;retryAt=0;status("");
+        }
+      }
+      return work().catch(error=>{if(current())fail(ticket,error);}).finally(()=>{
+        clearTimeout(timeout);if(flight===controller)flight=null;
+      });
+    }
+    return Object.freeze({update,pause,clear});
+  }
+  return Object.freeze({create,roomClips,roomMusic});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = globalThis.MundoPlayerAudio;

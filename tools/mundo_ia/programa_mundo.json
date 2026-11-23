@@ -41,8 +41,14 @@
           "goal": "Añade una vía explícita para pistas musicales que superen los dieciséis segundos del importador de efectos. Acota memoria y cola de decodificación, conserva la reproducción de los archivos anteriores, pausa y cancela al abandonar o cambiar de revisión. Verifica continuidad de muestras, consumo acotado y descarga únicamente de los segmentos autorizados.",
           "paths": [
             "web/audio-clips.js",
+            "web/audio-music.js",
             "web/audio-dsp.js",
+            "web/audio-library.js",
+            "studio/audio-panel.js",
+            "studio/publications.js",
             "mundo/scene-audio.js",
+            "server/room-source.cjs",
+            "server/room.cjs",
             "src/audio.cpp"
           ],
           "context": [

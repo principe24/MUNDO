@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const {test} = require("node:test");
 const {mount, save, open, until} = require("./support/studio-dom.cjs");
-const {MundoProject:P} = require("../server/room-runtime.cjs");
+const {MundoProject:P,MundoWorld:World} = require("../server/room-runtime.cjs");
 const scene = require("../web/audio-scene.js");
 
 function select(el, id) {
@@ -87,6 +87,7 @@ test("Studio informa de salida no disponible y sigue editando el mismo mundo", a
 });
 
 const clips = require("../web/audio-clips.js");
+const musicPackage=require("../web/audio-music.js");
 const {memoryDatabase} = require("./support/creator-database.cjs");
 
 function audioStudio() {
@@ -118,6 +119,36 @@ function namedBlob(bytes,name) {
   Object.defineProperty(file,"name",{value:name});
   return file;
 }
+
+function longWav(seconds){
+  const frames=clips.rate*seconds,bytes=new Uint8Array(44+frames*2),view=new DataView(bytes.buffer);
+  const text=(at,value)=>{for(let i=0;i<value.length;i++)bytes[at+i]=value.charCodeAt(i);};
+  text(0,"RIFF");view.setUint32(4,bytes.length-8,true);text(8,"WAVEfmt ");view.setUint32(16,16,true);
+  view.setUint16(20,1,true);view.setUint16(22,1,true);view.setUint32(24,clips.rate,true);view.setUint32(28,clips.rate*2,true);
+  view.setUint16(32,2,true);view.setUint16(34,16,true);text(36,"data");view.setUint32(40,frames*2,true);
+  for(let i=0;i<frames;i++)view.setInt16(44+i*2,Math.round(Math.sin(i/41)*9000),true);
+  return bytes;
+}
+
+test("Studio vincula, configura, publica y restaura una pista larga segmentada",async()=>{
+  const studio=audioStudio(),el=studio.element;el("new").click();
+  el("audioMusicName").value="Ruta nocturna";el("audioMusicLoop").value="once";
+  const input=el("audioMusicWav");input.files=[namedBlob(longWav(25),"privada-larga.wav")];
+  await input.onchange({target:input});
+  assert.match(el("audioMusicStatus").textContent,/3 partes/);
+  el("audioMusicLoop").value="loop";el("audioMusicApply").click();
+  await el("audioExport").click();const download=studio.getDownload();assert(download,el("audioStatus").textContent);assert.equal(download.name,"Mi_mundo.mroommusic");
+  const bytes=new Uint8Array(await download.blob.arrayBuffer()),bundle=musicPackage.unpack(bytes);
+  const roomInfo=require("../web/room-file.js").unpack(bundle.base),marker=scene.readMusic(World.decode(roomInfo.world));
+  assert.equal(bundle.stream.segments.length,3);assert.equal(bundle.stream.id,marker.streamId);assert.equal(marker.label,"Ruta nocturna");assert.equal(marker.loop,true);
+  const fresh=audioStudio(),openInput=fresh.element("inputFile");openInput.files=[namedBlob(bytes,download.name)];
+  await openInput.onchange({target:openInput});
+  assert.match(fresh.element("notice").textContent,/abierta como borrador/);
+  assert.equal(fresh.data.stores.get("music-catalog").size,1);
+  assert.equal(fresh.element("audioMusicName").value,"Ruta nocturna");
+  fresh.element("audioMusicRemove").click();await fresh.element("audioExport").click();
+  assert.equal(fresh.getDownload().name,"Mi_mundo.mroom");
+});
 
 test("WAV del catálogo a PCM estéreo y sala privada recuperable, con cancelación en vuelo",async()=>{
   const studio=audioStudio(), el=studio.element;

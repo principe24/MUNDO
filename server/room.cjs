@@ -17,7 +17,7 @@ const {ordinary,ProjectTravel,readProject,sceneCheckpoint,restoreSceneCheckpoint
 const root=path.resolve(__dirname,"..");
 const files=["mundo/MUNDO.html","mundo/player.js","mundo/entrada.js","mundo/residence.js","mundo/sectors.js","mundo/room.js","mundo/walk.js","mundo/drive.js","mundo/avatar.js",
   "web/world.js","web/geometry.js","web/meeting.js","web/room-file.js","web/circuit.js","web/component-record.js","web/project.js","web/interface.css","web/view.js","web/starting-content.js","web/zones.js",
-  "web/people-rig.js","mundo/online-people.js","web/bruma-look.js","web/creator-mesh.js","mundo/room-models.js","web/audio-scene.js","web/audio-clips.js","web/audio-dsp.js","web/audio-output.js","mundo/scene-audio.js"];
+  "web/people-rig.js","mundo/online-people.js","web/bruma-look.js","web/creator-mesh.js","mundo/room-models.js","web/audio-scene.js","web/audio-clips.js","web/audio-music.js","web/audio-dsp.js","web/audio-output.js","mundo/scene-audio.js"];
 const movement=["KeyW","KeyS","KeyA","KeyD","ShiftLeft"];
 const invitationLifetimeMs=30*60*1000;
 function fail(status,message){throw Object.assign(new Error(message),{status});}
@@ -530,6 +530,7 @@ async function roomFromSource(source){
   }
   const session=makeSession(single,null,new SessionCheckpoint(key));
   session.audioClips=source.audioClips;
+  session.musicStream=source.musicStream;
   return session;
 }
 function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=null,shareInes=false,shareBruma=false,creatorModels=null}={}){
@@ -540,6 +541,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
   const brumaPackage=shareBruma===true?require("./bruma-package.cjs").readBruma():null;
   const modelRevision=creatorModels?.size && !room.project ? room.revision : null;
   const offersRecordings=Boolean(room.audioClips?.size);
+  const offersMusic=Boolean(room.musicStream?.segments?.length);
   const entries=new EntryDelivery(room);
   const sectors=new SectorDelivery(room,entries.zones);
   const assets=new Map(files.map(file=>{
@@ -599,7 +601,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
       if(req.method==="GET"&&assets.has(url)){
         const ext=path.extname(url);return send(200,assets.get(url),{".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css"}[ext]);
       }
-      if(req.method!=="POST"||!["/room/join","/room/actor","/room/bruma","/room/audio","/room/audio-info","/room/model","/room/world","/room/world-part","/room/world-rest","/room/entry-info","/room/entry-part","/room/cell-index",
+      if(req.method!=="POST"||!["/room/join","/room/actor","/room/bruma","/room/audio","/room/audio-info","/room/music","/room/music-info","/room/model","/room/world","/room/world-part","/room/world-rest","/room/entry-info","/room/entry-part","/room/cell-index",
         "/room/sector-plan","/room/sector-part","/room/sector-ready","/room/sector-full",
         "/room/sector-ahead","/room/sector-ahead-part","/room/sector-usage","/room/sector-usage-stages",
         "/room/input","/room/meeting","/room/route","/room/leave"].includes(url))fail(404,"Ruta inválida.");
@@ -629,6 +631,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
       if(url==="/room/join"){
         if(req.headers["x-mundo-scene"]==="loading")p.scene="loading";
         if(offersRecordings)res.setHeader("x-mundo-audio-clips","wav-1");
+        if(offersMusic)res.setHeader("x-mundo-audio-music","pcmseg-1");
         if(actorPackage)res.setHeader("x-mundo-actor","ines-bajamar-1");
         if(modelRevision)res.setHeader("x-mundo-creator-models","mesh-1");
         if(brumaPackage)res.setHeader("x-mundo-car-art","bruma-1");
@@ -675,6 +678,27 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
         res.setHeader("x-mundo-audio-digest",item.digest);
         res.setHeader("content-length",item.bytes.length);
         return send(200,item.bytes,"audio/wav");
+      }
+      if(url==="/room/music-info" || url==="/room/music"){
+        if(!offersMusic)return send(url==="/room/music-info"?204:404,"");
+        if(!data||typeof data!=="object"||Array.isArray(data))fail(400,"Solicitud de música inválida.");
+        if(data.revision!==room.revision)fail(409,"La revisión musical cambió.");
+        const stream=room.musicStream;
+        if(url==="/room/music-info"){
+          if(Object.keys(data).length!==1)fail(400,"Solicitud de inventario musical inválida.");
+          const body=[p.lease,stream.id,stream.loop?"loop":"once",stream.segments.length,
+            ...stream.segments.map(item=>item.digest)].join("\n")+"\n";
+          return send(200,body,"text/plain");
+        }
+        if(Object.keys(data).length!==4||data.lease!==p.lease)fail(403,"La reserva de la plaza cambió.");
+        if(data.id!==stream.id||!Number.isInteger(data.index)||data.index<0||data.index>=stream.segments.length)
+          fail(404,"El segmento no pertenece a esta pista.");
+        const item=stream.segments[data.index],now=performance.now(),burst=4*1024*1024;
+        meter.musicBytes=Math.min(burst,(meter.musicBytes??burst)+(now-(meter.musicAt??now))*1024);meter.musicAt=now;
+        if(meter.musicSending||meter.musicBytes<item.bytes.length){res.setHeader("Retry-After","1");fail(429,"Espera antes de repetir esta descarga.");}
+        meter.musicBytes-=item.bytes.length;meter.musicSending=true;res.once("close",()=>{meter.musicSending=false;});
+        res.setHeader("x-mundo-audio-digest",item.digest);res.setHeader("x-mundo-music-index",String(item.index));
+        res.setHeader("content-length",item.bytes.length);return send(200,item.bytes,"audio/wav");
       }
       if(url==="/room/model"){
         if(!modelRevision)fail(404,"Este anfitrión no comparte modelos de autor.");

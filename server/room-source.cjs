@@ -6,6 +6,7 @@ const roomFile = require("../web/room-file.js");
 const modelRoom = require("../web/model-room.js");
 
 const audioRoom = require("../web/audio-clips.js");
+const audioMusic = require("../web/audio-music.js");
 const audioScene = require("../web/audio-scene.js");
 
 function openRoomSource(filename) {
@@ -28,12 +29,29 @@ function openRoomSource(filename) {
 
 function byteLimit(filename) {
   const ext=path.extname(filename).toLowerCase();
+  if(ext===".mroommusic")return audioMusic.maxBytes;
   if(ext===".mprojectaudio")return require("../web/audio-project.js").maxBytes;
   return ext===".mroomaudio" ? audioRoom.maxRoomBytes : ext===".mroom3d" ? modelRoom.maxBytes : ext===".mproject" ? 64*1024*1024 : ext===".mroom" ? roomFile.maxBytes : 24*1024*1024;
 }
 
 function readRoomSource(filename, data) {
   if (data.length < 24 || data.length > byteLimit(filename)) throw Error("Tamaño de archivo incompatible.");
+  if(path.extname(filename).toLowerCase()===".mroommusic"){
+    const {base,stream}=audioMusic.unpack(data),magic=Buffer.from(base.subarray(0,8)).toString("ascii");
+    const nested=magic.startsWith("MWAUDIO")?"revision.mroomaudio":magic==="MROOM3D1"?"revision.mroom3d":"revision.mroom";
+    const source=readRoomSource(nested,Buffer.from(base)),digests=[];
+    for(const item of stream.segments){
+      if(createHash("sha256").update(item.bytes).digest("hex")!==item.digest)
+        throw Error("El segmento musical no coincide con su huella.");
+      digests.push(item.digest);
+    }
+    const digest=createHash("sha256").update("MUNDO/music/v1\n"+digests.join("\n")+"\n").digest("hex");
+    const raw=BigInt("0x"+digest.slice(0,16)),id=String(raw||1n);
+    if(stream.id!==id)throw Error("La pista musical no coincide con su inventario.");
+    const {MundoWorld}=require("./room-runtime.cjs"),marker=audioScene.readMusic(MundoWorld.decode(source.bytes));
+    if(!marker||marker.streamId!==id)throw Error("La pista musical no corresponde a la sala.");
+    return {...source,musicStream:{id,digest,loop:marker.loop,label:marker.label,segments:stream.segments}};
+  }
   if(path.extname(filename).toLowerCase()===".mprojectaudio"){
     const {project,items}=require("../web/audio-project.js").unpack(data);
     const audioClips=new Map();

@@ -6,6 +6,7 @@ globalThis.MundoAudioScene = (() => {
   const prefix = "MUNDO/Audio/v1/";
   const presets = Object.freeze(["brisa", "agua", "maquina"]);
   const extendedPrefix = "MUNDO/Audio/v2/";
+  const musicPrefix = "MUNDO/Music/v1/";
   const groups = Object.freeze(["ambiente","efectos","musica","voces"]);
   const maxSources = 16;
   const isClip = key => typeof key === "string" && /^s[0-9a-f]{16}$/.test(key);
@@ -103,6 +104,47 @@ globalThis.MundoAudioScene = (() => {
     world.nodes.delete(existing(world, id));
   }
 
-  return Object.freeze({prefix, extendedPrefix, presets, groups, isClip, maxSources, read, add, update, remove});
+  function musicFields(fields) {
+    const id=String(fields?.streamId??""),label=fields?.label,loop=fields?.loop;
+    if(!/^[1-9][0-9]{0,19}$/.test(id)||BigInt(id)>0xffffffffffffffffn)
+      throw Error("Identificador de música inválido.");
+    if(typeof loop!=="boolean"||typeof label!=="string"||!label||label!==label.trim()||
+       /[\u0000-\u001f\u007f-\u009f/]/u.test(label)||encoder.encode(label).length>32)
+      throw Error("Usa un nombre visible de hasta 32 bytes para la música.");
+    return {streamId:id,label,loop};
+  }
+  function readMusic(world) {
+    let result=null,nodeId=null;
+    for(const n of world.nodes.values()){
+      if(!n.name.startsWith(musicPrefix))continue;
+      if(result)throw Error("Un mundo admite una pista musical larga.");
+      const match=/^([1-9][0-9]{0,19})\/(loop|once)\/(.+)$/su.exec(n.name.slice(musicPrefix.length));
+      if(!match||n.parent!==0n||n.shape!==0||n.visual!==0n||!n.s.every(v=>v===1)||
+         n.q[0]!==0||n.q[1]!==0||n.q[2]!==0||Math.abs(n.q[3])!==1||n.p.some(v=>v!==0))
+        throw Error("Marcador de música inválido en la pieza "+n.id+".");
+      result={id:String(n.id),...musicFields({streamId:match[1],loop:match[2]==="loop",label:match[3]})};nodeId=n.id;
+    }
+    if(nodeId!==null)for(const n of world.nodes.values())if(n.parent===nodeId)
+      throw Error("La música del mundo no admite piezas hijas.");
+    return result;
+  }
+  function setMusic(world,fields) {
+    const value=musicFields(fields),prior=readMusic(world);
+    const name=musicPrefix+[value.streamId,value.loop?"loop":"once",value.label].join("/");
+    if(encoder.encode(name).length>95)throw Error("Acorta el nombre de la pista musical.");
+    if(prior){
+      const key=BigInt(prior.id),node=world.nodes.get(key);
+      world.nodes.set(key,{...node,name});return key;
+    }
+    const factory=globalThis.MundoWorld||require("../server/room-runtime.cjs").MundoWorld;
+    return factory.add(world,name,0).id;
+  }
+  function removeMusic(world){
+    const prior=readMusic(world);
+    if(prior)world.nodes.delete(BigInt(prior.id));
+  }
+
+  return Object.freeze({prefix,extendedPrefix,musicPrefix,presets,groups,isClip,maxSources,read,add,update,remove,
+    readMusic,setMusic,removeMusic});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = globalThis.MundoAudioScene;

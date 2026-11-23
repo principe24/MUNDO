@@ -224,7 +224,7 @@ window.MundoRoomLink=class {
   }
   resetSeat(){
     this.resetRoomActor();
-    this.brumaOffered=false;this.clearRoomBruma();this.modelsOffered=false;this.audioClipsOffered=false;
+    this.brumaOffered=false;this.clearRoomBruma();this.modelsOffered=false;this.audioClipsOffered=false;this.audioMusicOffered=false;
     this.cancelWorld();this.wholeWorldOnly=false;this.noEntryEndpoint=false;this.noRestEndpoint=false;
     this.usageQueue?.close();this.usageQueue=null;
     this.noCellsEndpoint=false;this.soloResidence=null;
@@ -701,6 +701,7 @@ window.MundoRoomLink=class {
     if(!this.brumaOffered)this.clearRoomBruma();
     this.modelsOffered=Boolean(this.lease) && !project && response.headers.get("x-mundo-creator-models")==="mesh-1";
     this.audioClipsOffered=Boolean(this.lease) && response.headers.get("x-mundo-audio-clips")==="wav-1";
+    this.audioMusicOffered=Boolean(this.lease) && response.headers.get("x-mundo-audio-music")==="pcmseg-1";
     this.project=project;
     if(project){this.waiting=true;return this.scene;}
     if(this.revision!==data.revision){
@@ -1038,7 +1039,7 @@ window.MundoRoomLink=class {
   }
   async leave(){
     this.resetRoomActor();
-    this.brumaOffered=false;this.clearRoomBruma();this.modelsOffered=false;this.audioClipsOffered=false;
+    this.brumaOffered=false;this.clearRoomBruma();this.modelsOffered=false;this.audioClipsOffered=false;this.audioMusicOffered=false;
     this.cancelWorld();
     const turn=this.turn;
     try{

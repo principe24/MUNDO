@@ -1,14 +1,17 @@
 "use strict";
 // Private Studio catalog. Publication is an explicit operation over a sealed room.
 globalThis.MundoAudioLibrary = (() => {
-  const metadata="catalog", media="recordings";
+  const metadata="catalog", media="recordings", musicMetadata="music-catalog", musicMedia="music-segments";
   const maxCatalogBytes=32*1024*1024, maxRecordings=128;
   function open() {
     return new Promise((resolve,reject)=>{
-      const request=indexedDB.open("mundo-studio-audio",1);
+      const request=indexedDB.open("mundo-studio-audio",2);
       request.onupgradeneeded=()=>{
-        request.result.createObjectStore(metadata,{keyPath:"key"});
-        request.result.createObjectStore(media,{keyPath:"key"});
+        const names=request.result.objectStoreNames,missing=name=>!names?.contains||!names.contains(name);
+        if(missing(metadata))request.result.createObjectStore(metadata,{keyPath:"key"});
+        if(missing(media))request.result.createObjectStore(media,{keyPath:"key"});
+        if(missing(musicMetadata))request.result.createObjectStore(musicMetadata,{keyPath:"id"});
+        if(missing(musicMedia))request.result.createObjectStore(musicMedia,{keyPath:"id"});
       };
       request.onsuccess=()=>resolve(request.result);
       request.onerror=()=>reject(request.error);
@@ -27,6 +30,15 @@ globalThis.MundoAudioLibrary = (() => {
         run(tx.objectStore(metadata),tx.objectStore(media),value=>{result=value;},abort);
       });
     } finally {db.close();}
+  }
+  async function musicTransaction(mode,run){
+    const db=await open();
+    try{return await new Promise((resolve,reject)=>{
+      const tx=db.transaction([musicMetadata,musicMedia],mode);let result,failure;
+      tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(failure||tx.error||Error("No se pudo guardar el catálogo musical."));
+      const abort=error=>{failure=error;tx.abort();};
+      run(tx.objectStore(musicMetadata),tx.objectStore(musicMedia),value=>{result=value;},abort);
+    });}finally{db.close();}
   }
   const list=()=>transaction("readonly",(meta,_media,done)=>{
     const req=meta.getAll();req.onsuccess=()=>done(req.result.map(({key,name})=>({key,name})));
@@ -68,6 +80,61 @@ globalThis.MundoAudioLibrary = (() => {
     const base=String(file.name || "Grabación").split(/[\\/]/).pop().replace(/\.wav$/iu,"")
       .replace(/[\u0000-\u001f\u007f-\u009f]/gu,"").trim().slice(0,80) || "Grabación";
     return (await save([{...prepared,name:base}]))[0];
+  }
+  const listMusic=()=>musicTransaction("readonly",(meta,_files,done)=>{
+    const request=meta.getAll();request.onsuccess=()=>done(request.result.map(({id,name,segments,duration})=>({id,name,segments,duration})));
+  });
+  const getMusic=id=>musicTransaction("readonly",(meta,files,done)=>{
+    const record=meta.get(String(id)),content=files.get(String(id));
+    content.onsuccess=()=>done(record.result&&content.result?{...record.result,segments:content.result.segments}:null);
+  });
+  async function importMusicFile(file){
+    if(!file||!Number.isSafeInteger(file.size)||file.size<44||file.size>64*1024*1024)
+      throw Error("Selecciona una pista WAV de hasta 64 MiB.");
+    const prepared=await MundoAudioClips.prepareMusic(new Uint8Array(await file.arrayBuffer()));
+    const name=String(file.name||"Música").split(/[\\/]/).pop().replace(/\.wav$/iu,"")
+      .replace(/[\u0000-\u001f\u007f-\u009f]/gu,"").trim().slice(0,80)||"Música";
+    const duration=prepared.segments.reduce((sum,item)=>sum+(item.bytes.length-44)/2/MundoAudioClips.rate,0);
+    return musicTransaction("readwrite",(meta,files,done,abort)=>{
+      const all=meta.getAll();all.onsuccess=()=>{try{
+        const previous=all.result.find(item=>item.id===prepared.id);
+        if(previous){
+          if(previous.digest!==prepared.digest)throw Error("Dos pistas distintas tienen la misma identidad corta.");
+          done({...previous,segments:prepared.segments.length});return;
+        }
+        const total=all.result.reduce((sum,item)=>sum+item.size,0)+prepared.segments.reduce((sum,item)=>sum+item.bytes.length,0);
+        if(all.result.length>=16||total>128*1024*1024)throw Error("Se alcanzó el espacio del catálogo musical privado.");
+        const record={id:prepared.id,key:prepared.id,name,digest:prepared.digest,size:total-(all.result.reduce((sum,item)=>sum+item.size,0)),
+          segments:prepared.segments.length,duration};
+        meta.put(record);files.put({id:prepared.id,key:prepared.id,segments:prepared.segments.map(item=>({...item,bytes:new Uint8Array(item.bytes)}))});
+        done({...record,segments:prepared.segments.length});
+      }catch(error){abort(error);}};
+    });
+  }
+  async function restoreMusic(input,name){
+    const prepared=await MundoAudioMusic.verify(input),size=prepared.segments.reduce((sum,item)=>sum+item.bytes.length,0);
+    const duration=prepared.segments.reduce((sum,item)=>sum+(item.bytes.length-44)/2/MundoAudioClips.rate,0);
+    return musicTransaction("readwrite",(meta,files,done,abort)=>{
+      const all=meta.getAll();all.onsuccess=()=>{try{
+        const previous=all.result.find(item=>item.id===prepared.id);
+        if(previous){if(previous.digest!==prepared.digest)throw Error("Conflicto en el catálogo musical.");done(previous);return;}
+        if(all.result.length>=16||all.result.reduce((sum,item)=>sum+item.size,0)+size>128*1024*1024)
+          throw Error("Se alcanzó el espacio del catálogo musical privado.");
+        const record={id:prepared.id,key:prepared.id,name:String(name||"Música").slice(0,80),digest:prepared.digest,size,
+          segments:prepared.segments.length,duration};
+        meta.put(record);files.put({id:prepared.id,key:prepared.id,segments:prepared.segments.map(item=>({...item,bytes:new Uint8Array(item.bytes)}))});done(record);
+      }catch(error){abort(error);}};
+    });
+  }
+  async function packMusicRoom(input){
+    const base=await contents(input);let room=base;
+    if(String.fromCharCode(...room.subarray(0,8)).startsWith("MWAUDIO"))room=MundoAudioClips.unpack(room).room;
+    if(MundoAudioClips.hasModels(room))room=MundoModelRoom.unpack(room).room;
+    const info=await MundoRoomFile.verify(room),world=MundoWorld.decode(info.world),marker=MundoAudioScene.readMusic(world);
+    if(!marker)return base;
+    const item=await getMusic(marker.streamId);
+    if(!item)throw Error("Falta la pista musical "+marker.streamId+" en el catálogo privado.");
+    return MundoAudioMusic.pack(base,{id:item.id,digest:item.digest,segments:item.segments});
   }
   async function contents(input) {
     if(input instanceof Blob && input.size>MundoAudioClips.maxRoomBytes)throw Error("Archivo de sala demasiado grande.");
@@ -124,5 +191,5 @@ globalThis.MundoAudioLibrary = (() => {
     await save(loaded.items);
     return loaded.index;
   }
-  return Object.freeze({list,get,importFile,packRoom,openRoom,openProject});
+  return Object.freeze({list,get,importFile,listMusic,getMusic,importMusicFile,restoreMusic,packMusicRoom,packRoom,openRoom,openProject});
 })();

@@ -104,11 +104,37 @@ window.MundoPublications=(()=>{
     const stem=title.replace(/[^\p{L}\p{N}_-]+/gu,"_").slice(0,65)||"Mundo";
     const file={filename:stem+".mroom",blob:new Blob([room],{type:"application/octet-stream"})};
     const base=includeModels?await withModels(file,world):file;
-    if(!MundoAudioScene.read(world).some(s=>MundoAudioScene.isClip(s.preset)))return base;
-    const packed=await MundoAudioLibrary.packRoom(base.blob);
-    return {filename:stem+".mroomaudio",blob:new Blob([packed],{type:"application/octet-stream"})};
+    let packed=new Uint8Array(await base.blob.arrayBuffer()),extension=includeModels?".mroom3d":".mroom";
+    if(MundoAudioScene.read(world).some(s=>MundoAudioScene.isClip(s.preset))){
+      packed=await MundoAudioLibrary.packRoom(packed);extension=".mroomaudio";
+    }
+    if(MundoAudioScene.readMusic(world)){
+      packed=await MundoAudioLibrary.packMusicRoom(packed);extension=".mroommusic";
+    }
+    return {filename:stem+extension,blob:new Blob([packed],{type:"application/octet-stream"})};
   }
   async function openRoomFile(file){
+    if(/\.mroommusic$/i.test(file.name)){
+      if(file.size>MundoAudioMusic.maxBytes)throw Error("La sala musical excede el tamaño permitido.");
+      const bundle=MundoAudioMusic.unpack(new Uint8Array(await file.arrayBuffer()));
+      const stream=await MundoAudioMusic.verify(bundle.stream),baseMagic=String.fromCharCode(...bundle.base.subarray(0,8));
+      let opened;
+      if(baseMagic.startsWith("MWAUDIO"))opened=await MundoAudioLibrary.openRoom(bundle.base);
+      else{
+        const models=MundoAudioClips.hasModels(bundle.base)?MundoModelRoom.unpack(bundle.base):null;
+        const info=await MundoRoomFile.verify(models?models.room:bundle.base),world=MundoWorld.decode(info.world);
+        if(models){MundoModelRoom.match(world,models.items);await MundoCreatorAssets.restore(models.items);}
+        opened={info,world,hasModels:Boolean(models)};
+      }
+      const marker=MundoAudioScene.readMusic(opened.world);
+      if(!marker||marker.streamId!==stream.id)throw Error("La música no corresponde a este mundo.");
+      await MundoAudioLibrary.restoreMusic(stream,marker.label);
+      const {info,world}=opened;
+      if(info.vehicleRoot!==undefined)MundoDriving.roomCar(MundoGeometry.flatten(world),info.vehicleRoot);
+      return {hasAudio:baseMagic.startsWith("MWAUDIO"),hasMusic:true,hasModels:opened.hasModels,world,
+        worldSource:MundoWorld.sourceInfo(info.world,info.hash),title:info.title,vehicleRoot:info.vehicleRoot??null,
+        meetingPoint:info.meetingPoint??null,revision:info.revision};
+    }
     if(/\.mroomaudio$/i.test(file.name)){
       if(file.size>MundoAudioClips.maxRoomBytes)throw Error("La sala de audio excede el tamaño permitido.");
       const {info,world,hasModels}=await MundoAudioLibrary.openRoom(new Uint8Array(await file.arrayBuffer()));

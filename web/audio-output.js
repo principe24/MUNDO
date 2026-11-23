@@ -110,6 +110,7 @@ globalThis.MundoAudioOutput = (() => {
     return {
       unlock,
       get running() { return context?.state === "running"; },
+      get bufferedMusicSegments(){return mixer?mixer.bufferedMusicSegments():(music?.segments.length??0);},
       setClip(key, pcm) {
         if (closed) return;
         if (mixer) mixer.setClip(key, pcm);

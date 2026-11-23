@@ -1,0 +1,55 @@
+plugins { id 'com.android.application' version '8.7.3' }
+def ownerEdition = providers.gradleProperty('mundoPropietario').getOrElse('false')
+if (!(ownerEdition in ['true', 'false'])) {
+    throw new GradleException('mundoPropietario debe ser true o false')
+}
+def roomUserCA = providers.gradleProperty('mundoRoomUserCA').getOrElse('false')
+if (!(roomUserCA in ['true', 'false'])) {
+    throw new GradleException('mundoRoomUserCA debe ser true o false')
+}
+def isOwner = ownerEdition == 'true'
+if (isOwner) { layout.buildDirectory.set(layout.projectDirectory.dir('build-owner')) }
+android {
+    namespace 'studio.mundo.player'
+    compileSdk 35
+    defaultConfig {
+        applicationId(isOwner ? 'studio.mundo.player.owner' : 'studio.mundo.player')
+        manifestPlaceholders = [mundoLabel: isOwner ? 'MUNDO Propietario' : 'MUNDO']
+        testInstrumentationRunner 'studio.mundo.player.validation.TourRunner'
+        minSdk 26
+        targetSdk 35
+        versionCode 57
+        versionName '0.56.0'
+        ndk { abiFilters 'arm64-v8a' }
+        externalNativeBuild {
+            cmake {
+                arguments "-DMUNDO_ANDROID_OWNER_PLAYER=${isOwner ? 'ON' : 'OFF'}", '-DMUNDO_MOBILE_PLAYER=ON', '-DMUNDO_WORLD_TOOL=OFF',
+                          "-DMUNDO_HOST_MATC=${providers.gradleProperty('mundoMatc').getOrElse('')}"
+                if (providers.gradleProperty('mundoToolsDir').isPresent()) {
+                    arguments "-DFILAMENT_IMPORT_PREBUILT_EXECUTABLES_DIR=${providers.gradleProperty('mundoToolsDir').get()}"
+                }
+                targets 'mundo_mobile'
+            }
+        }
+    }
+    buildTypes {
+        validation {
+            initWith debug
+            applicationIdSuffix '.validation'
+            matchingFallbacks = ['debug']
+        }
+    }
+    if (roomUserCA == 'true') {
+        sourceSets.debug.res.srcDir 'src/roomUserCA/res'
+        sourceSets.validation.res.srcDir 'src/roomUserCA/res'
+    }
+    testBuildType 'validation'
+    sourceSets.androidTest.assets.srcDir(rootProject.file('../../examples'))
+    externalNativeBuild { cmake { path file('../../../CMakeLists.txt'); version '3.25.2' } }
+}
+
+dependencies {
+    // The QR camera and decoder are packaged with both editions. No online scan service is used.
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.zxing:core:3.5.3'
+}

@@ -1,8 +1,8 @@
 "use strict";
 
 globalThis.MundoPlayerAudio = (() => {
-  const groups = Object.freeze(["ambiente", "efectos", "musica"]);
-  const defaults = Object.freeze({volume: 80, muted: false, ambiente: 100, efectos: 100, musica: 100});
+  const groups = Object.freeze(["ambiente", "efectos", "musica", "voces"]);
+  const defaults = Object.freeze({volume: 80, muted: false, ambiente: 100, efectos: 100, musica: 100, voces: 100});
   function valid(prefs) {
     return prefs && Number.isInteger(prefs.volume) && prefs.volume >= 0 && prefs.volume <= 100 &&
       typeof prefs.muted === "boolean" && groups.every(group => Number.isInteger(prefs[group]) &&

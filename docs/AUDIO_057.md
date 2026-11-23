@@ -9,6 +9,10 @@ En MUNDO Studio, abre **Audio del mundo**. Puedes colocar una fuente de agua jun
 3. Entra en MUNDO con la invitación de esa plaza. Si el navegador lo solicita, pulsa **Activar audio**.
 4. Desde el punto de llegada encontrarás agua a la izquierda, el motor del taller a la derecha y la campana cerca del arco. El viento de fondo está en 2D. Gira la cámara y acércate al arco para escuchar la diferencia.
 
+Para comprobar un viaje, abre `examples/audio/Patios_del_carillon.mprojectaudio`, reúne a los dos jugadores y cruza el portal. Cada destino usa una campana original diferente. La grabación nueva se descarga cuando se confirma el cambio de mundo.
+
+En el cliente Windows, **F8** abre el mezclador y **F9** alterna el silencio. Los clientes móviles incluyen controles para la misma mezcla y guardan sus propios ajustes. En el motor se puede pausar una sola fuente por identificador, conservar su punto de reproducción y seguir mezclando las demás.
+
 La muestra estéreo que acompaña a la entrega dura doce segundos. Se generó por separado con el mezclador de MUNDO. El generador reproducible está en `examples/audio/render-demo.cjs`.
 
 ## Crear y publicar

@@ -94,6 +94,24 @@ void signals() {
     crowded.sources[0].radius=std::numeric_limits<double>::quiet_NaN();
     check(!m.set_scene(crowded) && !m.has_sources(),"invalid replacement drops old sound");
 }
+void source_pause() {
+    World w;
+    auto a=add(w,marker("maquina"),{1,0,0});
+    auto b=add(w,marker("agua"),{-1,0,0});
+    Mixer mix, baseline;
+    check(mix.set_world(w)&&baseline.set_world(w),"pause scene");
+    std::vector<float> reference(12288), block(4096);
+    baseline.render(reference);mix.render(block);
+    check(std::equal(block.begin(),block.end(),reference.begin()),"two-voice reference");
+    check(mix.set_source_paused(a,true)&&!mix.set_source_paused(a+b,true),"pause known source");
+    check(mix.set_world(w),"refresh paused scene");
+    mix.render(block);
+    for(std::size_t i=0;i<block.size();i+=2)check(block[i]==reference[4096+i] && block[i+1]==0,"independent pause");
+    check(mix.set_source_paused(a,false),"resume voice");mix.render(block);
+    for(std::size_t i=0;i<block.size();i+=2)
+        check(block[i]==reference[8192+i] && block[i+1]==reference[4096+i+1],"forgot oscillator cursor/other voice");
+}
+
 void extended_signals() {
     World world;
     auto id=add(world,"MUNDO/Audio/v2/maquina/50/1000/2d/400/once/efectos/Alarma",{999999,0,0});
@@ -108,6 +126,14 @@ void extended_signals() {
     m.set_group_volume(Group::efectos,1);m.render(pcm);
     check(energy(pcm,0)>1,"trigger after unmute");
     check(!m.trigger(id+1),"no phantom trigger");
+    check(m.set_source_paused(id,true) && m.trigger(id),"rearm paused one-shot");
+    m.render(pcm); check(energy(pcm,0)==0,"retrigger unexpectedly resumed a voice");
+    check(m.set_source_paused(id,false),"resume rearmed voice"); m.render(pcm);
+    check(energy(pcm,0)>1,"rearmed source lost its cursor");
+    check(m.set_source_paused(id,true),"pause before replacement");
+    auto replacement=*read_scene(world); replacement.sources[0].preset=Preset::brisa;
+    check(m.set_scene(replacement),"replace source with reused ID");
+    m.render(pcm); check(energy(pcm,0)>0,"new preset inherited prior pause");
     for(const auto* suffix:{"s0123456789abcdeG0/100/1/2d/100/once/musica/A","brisa/100/1/3d/200/once/music/A",
              "brisa/100/1/3d/200/end/ambiente/A","agua/100/1000/4d/250/loop/efectos/A",
              "maquina/100/10/2d/024/once/ambiente/A","maquina/100/10/2d/401/once/efectos/A"}) {
@@ -178,7 +204,10 @@ int transfer(int argc,char** argv) {
         scene.sources[0].position={-2.,1.,0};
         scene.sources[0].playback_rate=3.4; check(m.set_scene(scene),"live scene update");
         for(std::size_t i=0;i<scene.count;++i)if(!scene.sources[i].loop)check(m.trigger(scene.sources[i].id),"live trigger");
-        render_to(5603); m.clear_clips(); render_to(9611);
+        check(m.set_source_paused(scene.sources[0].id,true),"live pause");
+        render_to(5603); m.clear_clips();
+        check(m.set_scene(scene),"live refresh during source pause");
+        render_to(9701); check(m.set_source_paused(scene.sources[0].id,false),"live resume");
         check(m.set_clip(argv[4],clip),"live clip reinstall"); render_to(16381);
         m.set_listener({9999,1,0},-1.3); render_to(24017);
         m.set_listener({.2,0,0},2.2); render_to(32768);
@@ -194,7 +223,7 @@ int main(int argc,char** argv) {
     try{
         if(argc==3 || argc==4 || argc==6 || argc==7)return transfer(argc,argv);
         check(argc==1,"usage: audio_mixer [world.mworld stereo.f32]");
-        format();signals();extended_signals();clip_formats();
+        format();signals();source_pause();extended_signals();clip_formats();
         std::cout<<"Native audio scene, continuity, spatial PCM, silence, and limiter passed\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

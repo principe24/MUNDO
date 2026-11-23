@@ -44,7 +44,9 @@ function compare(world,rate,clip,live=false) {
     sources[0] = {...sources[0], position:[-2,1,0], playbackRate:3.4};
     mix.setSources(sources);
     for (const s of sources) if (!s.loop) assert.ok(mix.trigger(s.id));
-    to(5603); mix.clearClips(); to(9611);
+    assert.ok(mix.setSourcePaused(sources[0].id,true));
+    to(5603); mix.clearClips(); mix.setSources(sources);
+    to(9701); assert.ok(mix.setSourcePaused(sources[0].id,false));
     mix.setClip(clip.key, Clips.decode(clip.bytes)); to(16381);
     mix.setListener([9999,1,0],-1.3); to(24017);
     mix.setListener([.2,0,0],2.2); to(frames);

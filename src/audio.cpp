@@ -305,12 +305,24 @@ void Mixer::clear_clips() noexcept {
 bool Mixer::trigger(EntityId id) noexcept {
     for (std::size_t i = 0; i < count_; ++i) {
         auto& v = voices_[i];
-        if (v.source.id == id && !v.source.loop) { v = new_voice(v.source); return true; }
+        if (v.source.id == id && !v.source.loop) {
+            const bool was_paused = v.paused;
+            v = new_voice(v.source);
+            v.paused = was_paused;
+            return true;
+        }
     }
     return false;
 }
 
 void Mixer::set_paused(bool paused) noexcept { paused_ = paused; }
+
+bool Mixer::set_source_paused(EntityId id, bool paused) noexcept {
+    for (std::size_t i = 0; i < count_; ++i) {
+        if (voices_[i].source.id == id) { voices_[i].paused = paused; return true; }
+    }
+    return false;
+}
 
 void Mixer::reset() noexcept {
     voices_ = {}; count_ = 0;
@@ -368,7 +380,7 @@ void Mixer::render(std::span<float> output) noexcept {
     constexpr double seconds[]{2, 1, 1.5, 0};
     for (std::size_t i = 0; i < count_; ++i) {
         auto& v = voices_[i];
-        if (v.source.preset == Preset::clip && !v.data) continue;
+        if (v.paused || (v.source.preset == Preset::clip && !v.data)) continue;
         const auto duration = seconds[static_cast<unsigned>(v.source.preset)] * rate_;
         const auto gain = groups_[static_cast<unsigned>(v.source.group)];
         for (std::size_t j = 0; j < samples && !v.finished; j += 2) {

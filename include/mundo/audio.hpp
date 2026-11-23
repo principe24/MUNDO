@@ -69,6 +69,7 @@ public:
     void clear_clips() noexcept;
     bool trigger(EntityId id) noexcept;
     void set_paused(bool paused) noexcept;
+    bool set_source_paused(EntityId id, bool paused) noexcept;
     void reset() noexcept;
     [[nodiscard]] bool has_sources() const noexcept { return count_ != 0; }
 
@@ -86,7 +87,7 @@ private:
         double left{}, right{}, aim_l{}, aim_r{}, step_l{}, step_r{};
         unsigned ramp{};
         double cursor{}, age{};
-        bool started{}, finished{};
+        bool started{}, finished{}, paused{};
         const std::vector<float>* data{};
         double random() noexcept;
         void tick(double step) noexcept;

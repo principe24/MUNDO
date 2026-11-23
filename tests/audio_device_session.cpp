@@ -107,6 +107,20 @@ int main() {
             check(power()==0,"mute survives world replacement");
             levels.muted=false;playback.set_levels(levels);
             check(power()>0,"unmute restores requested group");
+            levels.volume=0;
+            check(playback.transition_levels(levels,50),"native transition accepted");
+            auto block_power=[] {
+                std::array<float,1024> buffer{};callback(callback_owner,buffer);
+                double sum=0;for(auto sample:buffer)sum+=sample*sample;return sum;
+            };
+            const double fading=block_power();
+            for(unsigned i=0;i<6;++i)block_power();
+            const double silent=block_power();
+            check(fading>silent && silent<1e-9,"native transition did not reach silence");
+            levels.volume=100;
+            check(!playback.transition_levels(levels,60001),"unbounded transition accepted");
+            levels.groups[0]=101;
+            check(!playback.transition_levels(levels,20),"invalid transition levels accepted");
         }
         std::cout << "Audio room lifecycle passed with a simulated device.\n";
     } catch(const std::exception& e) {

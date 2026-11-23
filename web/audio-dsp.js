@@ -75,9 +75,22 @@ globalThis.MundoAudioDSP = (() => {
   }
   function create(rate) {
     if (!Number.isInteger(rate) || rate < 8000 || rate > 192000) throw Error("Frecuencia de audio inválida.");
-    let voices = [], listener = [0,0,0], yaw = 0, master = 1, paused = false;
+    let voices = [], listener = [0,0,0], yaw = 0, paused = false;
     const rampSamples = Math.max(1, Math.round(.01 * rate));
-    const clips = new Map(), groupLevels = {ambiente:1,efectos:1,musica:1,voces:1};
+    const gain=()=>({value:1,target:1,step:0,remaining:0});
+    const master=gain(), clips = new Map(), groupLevels = {ambiente:gain(),efectos:gain(),musica:gain(),voces:gain()};
+    function gainSet(item,value) { item.value=item.target=value;item.step=0;item.remaining=0; }
+    function gainFade(item,value,milliseconds) {
+      if (!Number.isInteger(milliseconds) || milliseconds < 0 || milliseconds > 60000) throw Error("Duración de transición inválida.");
+      const frames=Math.round(rate*milliseconds/1000);
+      if (!frames) return gainSet(item,value);
+      item.target=value;item.remaining=frames;item.step=(value-item.value)/frames;
+    }
+    const gainAt=(item,frame)=>frame>=item.remaining?item.target:item.value+item.step*frame;
+    function gainAdvance(item,frames) {
+      if (frames>=item.remaining) gainSet(item,item.target);
+      else {item.value+=item.step*frames;item.remaining-=frames;}
+    }
     function configure(voice) {
       const pitch = voice.source.playbackRate;
       voice.slowCoeff = 1 - Math.exp(-2 * Math.PI * 80 * pitch / rate);
@@ -150,12 +163,21 @@ globalThis.MundoAudioDSP = (() => {
     }
     function setVolume(value) {
       if (!Number.isFinite(value) || value < 0 || value > 1) throw Error("Volumen general inválido.");
-      master = value;
+      gainSet(master,value);
     }
     function setGroupVolume(group, value) {
       if (!groups.includes(group) || !Number.isFinite(value) || value < 0 || value > 1)
         throw Error("Volumen de grupo inválido.");
-      groupLevels[group] = value;
+      gainSet(groupLevels[group],value);
+    }
+    function fadeVolume(value, milliseconds) {
+      if (!Number.isFinite(value) || value < 0 || value > 1) throw Error("Volumen general inválido.");
+      gainFade(master,value,milliseconds);
+    }
+    function fadeGroupVolume(group, value, milliseconds) {
+      if (!groups.includes(group) || !Number.isFinite(value) || value < 0 || value > 1)
+        throw Error("Volumen de grupo inválido.");
+      gainFade(groupLevels[group],value,milliseconds);
     }
     function setClip(key, clip) {
       if (typeof key !== "string" || !clipKey.test(key) || clip?.sampleRate !== 24000 ||
@@ -212,7 +234,7 @@ globalThis.MundoAudioDSP = (() => {
           const silent = voice.left === 0 && voice.right === 0 && !voice.ramp;
           if (silent && (s.loop || !voice.started)) break;
           voice.started = true;
-          let sample = emit(voice) * group;
+          let sample = emit(voice) * gainAt(group,i);
           if (!s.loop && duration) {
             const remaining = duration * rate - voice.age;
             sample *= Math.min(1, remaining / (.01 * rate));
@@ -224,12 +246,15 @@ globalThis.MundoAudioDSP = (() => {
         }
       }
       for (let i = 0; i < left.length; ++i) {
-        left[i] = master * left[i] / (1 + Math.abs(left[i]));
-        right[i] = master * right[i] / (1 + Math.abs(right[i]));
+        left[i] = gainAt(master,i) * left[i] / (1 + Math.abs(left[i]));
+        right[i] = gainAt(master,i) * right[i] / (1 + Math.abs(right[i]));
       }
+      gainAdvance(master,left.length);
+      for (const group of groups) gainAdvance(groupLevels[group],left.length);
     }
     function reset() { voices = []; clips.clear(); listener = [0,0,0]; yaw = 0; }
-    return Object.freeze({setSources, setListener, setVolume, setGroupVolume, setPaused, setSourcePaused, setClip, clearClips, trigger, render, reset});
+    return Object.freeze({setSources, setListener, setVolume, setGroupVolume, fadeVolume, fadeGroupVolume,
+      setPaused, setSourcePaused, setClip, clearClips, trigger, render, reset});
   }
   return Object.freeze({create});
 })();

@@ -112,6 +112,38 @@ void source_pause() {
         check(block[i]==reference[8192+i] && block[i+1]==reference[4096+i+1],"forgot oscillator cursor/other voice");
 }
 
+void gain_automation() {
+    World world;
+    add(world,"MUNDO/Audio/v2/maquina/100/1000/2d/100/loop/musica/Fondo");
+    Mixer whole(8000), blocks(8000), reference(8000);
+    check(whole.set_world(world)&&blocks.set_world(world)&&reference.set_world(world),"automation scene");
+    whole.set_volume(0); blocks.set_volume(0);
+    check(whole.fade_volume(1,100)&&blocks.fade_volume(1,100),"master fade accepted");
+    std::vector<float> a(2400),b(a.size()),raw(a.size()),paused(320);
+    whole.render(a);
+    for(std::size_t i=0;i<b.size();i+=80) blocks.render(std::span(b).subspan(i,80));
+    reference.render(raw);
+    check(a==b,"master automation depends on render block size");
+    for(std::size_t frame : {80u,240u,640u,799u,900u}) {
+        const auto i=2*frame;
+        if(std::abs(raw[i])>.00001) {
+            const auto expected=std::min(1.,double(frame)/800.);
+            check(std::abs(a[i]/raw[i]-expected)<.00001,"master automation curve");
+        }
+    }
+    Mixer group(8000), direct(8000);
+    check(group.set_world(world)&&direct.set_world(world),"group automation scene");
+    group.set_group_volume(Group::musica,0);direct.set_group_volume(Group::musica,0);
+    check(group.fade_group_volume(Group::musica,1,100),"group fade accepted");
+    group.set_paused(true);group.render(paused);group.set_paused(false);
+    std::vector<float> resumed(400),expected(400);
+    group.render(resumed);direct.fade_group_volume(Group::musica,1,100);direct.render(expected);
+    check(resumed==expected,"pause advanced group automation");
+    check(!group.fade_volume(-1,10)&&!group.fade_volume(1,60001),"invalid master fade accepted");
+    check(!group.fade_group_volume(static_cast<Group>(9),1,10)&&
+          !group.fade_group_volume(Group::musica,2,10),"invalid group fade accepted");
+}
+
 void extended_signals() {
     World world;
     auto id=add(world,"MUNDO/Audio/v2/maquina/50/1000/2d/400/once/efectos/Alarma",{999999,0,0});
@@ -223,7 +255,7 @@ int main(int argc,char** argv) {
     try{
         if(argc==3 || argc==4 || argc==6 || argc==7)return transfer(argc,argv);
         check(argc==1,"usage: audio_mixer [world.mworld stereo.f32]");
-        format();signals();source_pause();extended_signals();clip_formats();
+        format();signals();source_pause();gain_automation();extended_signals();clip_formats();
         std::cout<<"Native audio scene, continuity, spatial PCM, silence, and limiter passed\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

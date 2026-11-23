@@ -26,10 +26,17 @@ public:
     bool has_sources() const noexcept { return enabled_; }
 
     void set_levels(const AudioLevels& levels) {
+        (void)transition_levels(levels, 0);
+    }
+
+    bool transition_levels(const AudioLevels& levels, unsigned milliseconds) {
+        if (levels.volume > 100 || milliseconds > 60000 ||
+            std::any_of(levels.groups.begin(),levels.groups.end(),[](unsigned value){return value > 100;})) return false;
         std::lock_guard guard(mutex_);
-        mixer_.set_volume(levels.muted ? 0.0 : static_cast<double>(levels.volume) / 100.0);
+        if (!mixer_.fade_volume(levels.muted ? 0.0 : static_cast<double>(levels.volume) / 100.0, milliseconds)) return false;
         for (std::size_t i=0;i<levels.groups.size();++i)
-            mixer_.set_group_volume(static_cast<audio::Group>(i),static_cast<double>(levels.groups[i]) / 100.0);
+            if (!mixer_.fade_group_volume(static_cast<audio::Group>(i),static_cast<double>(levels.groups[i]) / 100.0,milliseconds)) return false;
+        return true;
     }
 
     void install(const World& world, bool new_session) {

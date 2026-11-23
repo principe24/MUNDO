@@ -274,11 +274,41 @@ void Mixer::set_listener(Vec3 position, double yaw) noexcept {
 }
 
 void Mixer::set_volume(double volume) noexcept {
-    if (volume >= 0 && volume <= 1) volume_ = volume;
+    if (volume >= 0 && volume <= 1) volume_.set(volume);
 }
 
 void Mixer::set_group_volume(Group group, double volume) noexcept {
-    if (group <= Group::voces && volume >= 0 && volume <= 1) groups_[static_cast<unsigned>(group)] = volume;
+    if (group <= Group::voces && volume >= 0 && volume <= 1) groups_[static_cast<unsigned>(group)].set(volume);
+}
+
+void Mixer::Gain::set(double next) noexcept {
+    value = target = next; step = 0; remaining = 0;
+}
+
+void Mixer::Gain::fade(double next, std::uint64_t frames) noexcept {
+    if (!frames) { set(next); return; }
+    target = next; remaining = frames; step = (target - value) / static_cast<double>(frames);
+}
+
+double Mixer::Gain::at(std::uint64_t frame) const noexcept {
+    return frame >= remaining ? target : value + step * static_cast<double>(frame);
+}
+
+void Mixer::Gain::advance(std::uint64_t frames) noexcept {
+    if (frames >= remaining) { value = target; step = 0; remaining = 0; }
+    else { value += step * static_cast<double>(frames); remaining -= frames; }
+}
+
+bool Mixer::fade_volume(double volume, unsigned milliseconds) noexcept {
+    if (!(volume >= 0 && volume <= 1) || milliseconds > 60000) return false;
+    const auto frames = (static_cast<std::uint64_t>(rate_) * milliseconds + 500) / 1000;
+    volume_.fade(volume, frames); return true;
+}
+
+bool Mixer::fade_group_volume(Group group, double volume, unsigned milliseconds) noexcept {
+    if (group > Group::voces || !(volume >= 0 && volume <= 1) || milliseconds > 60000) return false;
+    const auto frames = (static_cast<std::uint64_t>(rate_) * milliseconds + 500) / 1000;
+    groups_[static_cast<unsigned>(group)].fade(volume, frames); return true;
 }
 
 bool Mixer::set_clip(std::string_view name, Clip clip) noexcept {
@@ -375,14 +405,14 @@ double Mixer::sample(Voice& v) const noexcept {
 
 void Mixer::render(std::span<float> output) noexcept {
     std::fill(output.begin(), output.end(), 0.f);
-    if (paused_ || !count_) return;
+    if (paused_) return;
     const std::size_t samples = output.size() & ~std::size_t{1};
+    const std::size_t frames = samples / 2;
     constexpr double seconds[]{2, 1, 1.5, 0};
     for (std::size_t i = 0; i < count_; ++i) {
         auto& v = voices_[i];
         if (v.paused || (v.source.preset == Preset::clip && !v.data)) continue;
         const auto duration = seconds[static_cast<unsigned>(v.source.preset)] * rate_;
-        const auto gain = groups_[static_cast<unsigned>(v.source.group)];
         for (std::size_t j = 0; j < samples && !v.finished; j += 2) {
             if (v.ramp) {
                 if (--v.ramp == 0) { v.left = v.aim_l; v.right = v.aim_r; }
@@ -390,7 +420,7 @@ void Mixer::render(std::span<float> output) noexcept {
             }
             if (v.left == 0 && v.right == 0 && !v.ramp && (v.source.loop || !v.started)) break;
             v.started = true;
-            auto value = sample(v) * gain;
+            auto value = sample(v) * groups_[static_cast<unsigned>(v.source.group)].at(j/2);
             if (!v.source.loop && duration > 0) {
                 value *= std::min(1., (duration-v.age)/(.01*rate_));
                 v.age += v.source.playback_rate;
@@ -402,7 +432,9 @@ void Mixer::render(std::span<float> output) noexcept {
     }
     for (std::size_t i = 0; i < samples; ++i) {
         const double sample = output[i];
-        output[i] = static_cast<float>(volume_ * sample / (1 + std::abs(sample)));
+        output[i] = static_cast<float>(volume_.at(i/2) * sample / (1 + std::abs(sample)));
     }
+    volume_.advance(frames);
+    for (auto& group : groups_) group.advance(frames);
 }
 } // namespace mundo::audio

@@ -65,6 +65,10 @@ public:
     void set_listener(Vec3 position, double yaw) noexcept;
     void set_volume(double volume) noexcept;
     void set_group_volume(Group group, double volume) noexcept;
+    // Sample-accurate gain automation. A zero duration is an immediate change.
+    // Longer ramps are bounded so untrusted scene controls cannot retain state forever.
+    bool fade_volume(double volume, unsigned milliseconds) noexcept;
+    bool fade_group_volume(Group group, double volume, unsigned milliseconds) noexcept;
     bool set_clip(std::string_view key, Clip clip) noexcept;
     void clear_clips() noexcept;
     bool trigger(EntityId id) noexcept;
@@ -78,6 +82,14 @@ public:
     void render(std::span<float> interleaved) noexcept;
 
 private:
+    struct Gain {
+        double value{1}, target{1}, step{};
+        std::uint64_t remaining{};
+        void set(double next) noexcept;
+        void fade(double next, std::uint64_t frames) noexcept;
+        [[nodiscard]] double at(std::uint64_t frame) const noexcept;
+        void advance(std::uint64_t frames) noexcept;
+    };
     struct Voice {
         Source source{};
         std::uint32_t rng{};
@@ -95,12 +107,13 @@ private:
 
     struct ClipEntry { std::uint64_t key{}; Clip data; };
     std::array<ClipEntry, max_sources> clips_{};
-    std::array<double, 4> groups_{1, 1, 1, 1};
+    std::array<Gain, 4> groups_{};
     unsigned rate_, ramp_samples_;
     std::array<Voice, max_sources> voices_{};
     std::size_t count_{};
     Vec3 listener_{};
-    double yaw_{}, volume_{1.0};
+    double yaw_{};
+    Gain volume_{};
     bool paused_{};
 
     void configure(Voice&) const noexcept;

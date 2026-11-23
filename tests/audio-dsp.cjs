@@ -69,6 +69,26 @@ test("los niveles de grupo y volumen general actúan en la mezcla y mantienen la
   const [out]=render(m);assert.ok(out.every(v=>v>-1 && v<1));assert.ok(rms(out)>.1);
 });
 
+test("las transiciones de buses son exactas, pausan su reloj y no dependen del tamaño de bloque",()=>{
+  const s=source({spatial:"2d",group:"musica"});
+  const whole=setup(s,8000),blocks=setup(s,8000),reference=setup(s,8000);
+  whole.setVolume(0);blocks.setVolume(0);whole.fadeVolume(1,100);blocks.fadeVolume(1,100);
+  const a=render(whole,1200)[0], raw=render(reference,1200)[0];
+  const pieces=[];
+  for(let i=0;i<15;i++) pieces.push(...render(blocks,80)[0]);
+  assert.deepEqual(a,Float32Array.from(pieces));
+  for(const frame of [80,240,640,799,900]) if(Math.abs(raw[frame])>.00001)
+    assert.ok(Math.abs(a[frame]/raw[frame]-Math.min(1,frame/800))<.00001);
+
+  const group=setup(s,8000),direct=setup(s,8000);
+  group.setGroupVolume("musica",0);direct.setGroupVolume("musica",0);
+  group.fadeGroupVolume("musica",1,100);group.setPaused(true);render(group,160);group.setPaused(false);
+  direct.fadeGroupVolume("musica",1,100);
+  assert.deepEqual(render(group,200),render(direct,200));
+  for(const call of [()=>group.fadeVolume(-1,10),()=>group.fadeVolume(1,60001),
+    ()=>group.fadeGroupVolume("otro",1,10),()=>group.fadeGroupVolume("musica",1,1.5)]) assert.throws(call);
+});
+
 test("one-shot sintetizado termina, permanece consumido con el mismo ID y admite un nuevo disparo",()=>{
   const s=source({preset:"agua",loop:false,playbackRate:2}),m=setup(s);
   const [first]=render(m,12000);

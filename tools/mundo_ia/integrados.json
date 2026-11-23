@@ -1,0 +1,22 @@
+{
+  "formato": "MundoIA-integrados-1",
+  "tareas": {
+    "modelos-nativos-01": "7270e41e59e3934caacde0e22de38cb3d2ebeda4",
+    "nucleo-01": "eaf56c506901b74fdd94492fd357d560253deb87",
+    "nucleo-02": "a04ff312cabe24fa026eca570ab7688877fad085",
+    "nucleo-03": "7e36a4b965c74ce020fbcefa5941f4a05b19ab38",
+    "archivos-01": "1a19c51c5bb2e7152e5b8600c4da8899e8ecd28d",
+    "plugins-01": "a1202bada3b322b910acdddac13834313d4b0b4f",
+    "nucleo-04": "99ce0172f33d25f9e1934aacaa89504a5c0d74c0",
+    "archivos-02": "9ccf7e303520bc10089dffa7b25146e1a122c8f9",
+    "plugins-02": "52683f8bb51f61ae5b1f43a5d175fb1fb297ee16",
+    "nucleo-05": "676e9c02110baa8824ad5c09e8356a3406552441",
+    "archivos-03": "31445dcd3586f09407b3df524c5963a060d4a3c9",
+    "plugins-03": "12e905ec3370cfe37178258a97ee822f50ca60a2",
+    "plugins-04": "2de69986feaedb5a53683c56f8e03fa19b8dbe83",
+    "modelos-01": "879b61821375f84c036c26962811e45f75b1a1e9",
+    "modelos-02": "389343bec202aac18187a59e8a783af6d5e3be26",
+    "navegacion-01": "e3f9f70e965ce90197e019e052c14ab2b5351975",
+    "navegacion-02": "77f940ad35111e46055b0eb33dfdddfdf0395435"
+  }
+}

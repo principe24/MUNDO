@@ -6,6 +6,12 @@ Mundo Engie es el motor de MUNDO Studio, la aplicación de creación, y de MUNDO
 
 **Meta del propietario.** Desarrollar un motor propio de propósito general con un alcance comparable a Unreal. MUNDO y MUNDO Studio son las primeras aplicaciones del motor.
 
+## Navegación y personajes de sala · 0.56.0
+
+En Studio, abre **Personajes y rutas a pie** para colocar puntos sobre el suelo, ordenar las paradas, asignar la ruta a un personaje y comprobar el recorrido. El guía de **Los dos patios** rodea un muro y hace una pausa. Al cruzar al jardín, el segundo guía acompaña a un visitante.
+
+[Proyecto jugable y comando de anfitrión](examples/navigation/README.md) · [Funcionamiento, verificaciones y continuación](docs/NAVEGACION_056.md)
+
 ## Edición de escenas, documentos y plugins · 0.55.0
 
 El anfitrión puede abrir una sala por su identificador, editarla en un solo lote y guardar el borrador en una copia nueva del proyecto. Studio permite añadir plantillas locales de componentes mediante archivos `.mplugin`. El archivo de proyecto conserva los componentes de las piezas después de retirar la extensión del editor.

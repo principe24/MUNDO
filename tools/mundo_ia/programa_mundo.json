@@ -1,0 +1,706 @@
+{
+  "formato": "MundoIA-areas-1",
+  "areas": [
+    {
+      "key": "navegacion",
+      "title": "Navegación e IA de personajes",
+      "tasks": [
+        {
+          "key": "navegacion-01",
+          "title": "Crear una ruta de puntos de paso en Studio",
+          "goal": "Permite colocar, ordenar y guardar puntos de paso de una ruta nombrada usando posiciones en la escena. Conserva identificadores estables al editar el proyecto y ofrece una superposición de segmentos para previsualizar su orden.",
+          "paths": [
+            "studio/district-panel.js",
+            "studio/preview.js",
+            "studio/Mundo_Studio.html",
+            "web/project.js"
+          ],
+          "context": [
+            "web/world.js"
+          ]
+        },
+        {
+          "key": "navegacion-02",
+          "title": "Recorrer una ruta de autor bajo autoridad del anfitrión",
+          "goal": "Incluye rutas de puntos limitadas en la publicación. Mueve una entidad de recorrido según el tiempo de simulación del servidor y expón el estado a la vista web. Ante un punto inválido, conserva la última posición válida. Los mapas sin rutas siguen usando su recorrido anterior.",
+          "paths": [
+            "web/room-file.js",
+            "studio/publications.js",
+            "server/room-runtime.cjs",
+            "mundo/online-people.js"
+          ],
+          "context": [
+            "server/room-wire.cjs",
+            "web/project.js"
+          ]
+        },
+        {
+          "key": "navegacion-03",
+          "title": "Caminar por rampas originales con altura de superficie",
+          "goal": "Amplía el contrato físico de Studio, del servidor y del caminante para representar una rampa inclinada de forma explícita. Comprueba normal, pendiente transitable, despeje y dirección de subida y bajada. Conserva los colisionadores de mapas existentes. Verifica con una escena jugable, una pendiente demasiado pronunciada y dos pisos superpuestos.",
+          "paths": [
+            "web/navigation-3d.js",
+            "mundo/walk.js",
+            "web/geometry.js"
+          ],
+          "context": [
+            "docs/NAVEGACION_056.md",
+            "src/character.cpp"
+          ]
+        },
+        {
+          "key": "navegacion-04",
+          "title": "Autorizar un enlace de escalera entre dos plantas",
+          "goal": "Permite al creador colocar y quitar un enlace de escalera entre superficies ya caminables. El servidor comprobará ambos extremos, ocupación y espacio, animará la transición y podrá cancelarla con retorno a una posición válida. Conserva las rutas anteriores. Verifica publicación, dos observadores y recuperación al interrumpir el cruce.",
+          "paths": [
+            "web/npc-routes.js",
+            "web/navigation-3d.js",
+            "studio/npc-panel.js",
+            "server/npc-simulation.cjs"
+          ],
+          "context": [
+            "docs/NAVEGACION_056.md",
+            "web/project.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "nucleo",
+      "title": "Núcleo, archivos y plugins",
+      "tasks": [
+        {
+          "key": "nucleo-01",
+          "title": "Conservar componentes de autor con versión",
+          "goal": "Añade al proyecto web una colección opcional de componentes con clave y versión por instancia. Conserva campos de versiones futuras al abrir y volver a guardar. Rechaza claves duplicadas y acota los datos por componente. Los proyectos anteriores se abren con la colección vacía.",
+          "paths": [
+            "web/project.js",
+            "web/component-record.js"
+          ],
+          "context": [
+            "web/world.js",
+            "studio/project-panel.js"
+          ]
+        },
+        {
+          "key": "nucleo-02",
+          "title": "Leer los componentes desde Studio",
+          "goal": "Conecta la colección de componentes con el inspector de la selección de Studio. Muestra la clave y versión de los componentes de la entidad, conserva los desconocidos al duplicarla y actualiza el inspector al deshacer o cambiar de proyecto.",
+          "paths": [
+            "studio/editor.js",
+            "studio/project-panel.js",
+            "studio/Mundo_Studio.html"
+          ],
+          "context": [
+            "web/component-record.js",
+            "web/project.js",
+            "studio/tools.js"
+          ]
+        },
+        {
+          "key": "nucleo-03",
+          "title": "Aplicar un lote de cambios de escena de forma atómica",
+          "goal": "Implementa la creación, edición y eliminación ordenadas en World con referencias a entidades creadas en el mismo lote. Si una operación falla, identifica su posición y conserva la escena y el siguiente ID. Expón el lote en mundo-world batch sobre un archivo de salida nuevo y conserva los formatos existentes.",
+          "paths": [
+            "include/mundo/world.hpp",
+            "src/world.cpp",
+            "tools/worldctl.cpp"
+          ],
+          "context": [
+            "src/world_file.cpp"
+          ]
+        },
+        {
+          "key": "archivos-01",
+          "title": "Abrir y guardar documentos nativos del motor",
+          "goal": "Unifica la lectura nativa de documentos con límites y el guardado de mundos en modo crear o reemplazar. Integra consulta y extracción por ID estable de los mundos de un proyecto en mundo-world, validando el contenido antes de adoptar la escena. Conserva los formatos y la semántica de no sobrescritura de la CLI.",
+          "paths": [
+            "include/mundo/document_file.hpp",
+            "include/mundo/project.hpp",
+            "src/document_digest.cpp",
+            "src/document_file.cpp",
+            "src/project_file.cpp",
+            "src/private_file.cpp",
+            "src/private_file.hpp",
+            "tools/worldctl.cpp",
+            "CMakeLists.txt"
+          ],
+          "context": [
+            "include/mundo/world.hpp",
+            "src/project_metadata.cpp"
+          ]
+        },
+        {
+          "key": "plugins-01",
+          "title": "Instalar plugins declarativos locales para componentes de autor",
+          "goal": "Ofrece en Studio un gestor de manifiestos de datos .mplugin que instale, active o desactive plugins y aplique sus presets a la pieza seleccionada, con comprobación de versiones, dependencias y ciclos. Guarda el catálogo local por origen y conserva el formato anterior de proyectos. Las extensiones utilizan datos declarativos.",
+          "paths": [
+            "web/plugin-registry.js",
+            "web/component-record.js",
+            "studio/plugin-panel.js",
+            "studio/component-inspector.js",
+            "studio/Mundos.html",
+            "server/host-panel.cjs",
+            "tools/pluginctl.cjs"
+          ],
+          "context": [
+            "studio/editor.js"
+          ]
+        },
+        {
+          "key": "nucleo-04",
+          "title": "Detectar un conflicto de revisión antes de editar la escena",
+          "goal": "Añade a la API del núcleo una variante de edición por lotes que acepte la revisión esperada de la escena y distinga un conflicto de revisión de un cambio inválido. La revisión identifica todo el contenido semántico guardado, incluido el próximo ID. Antes de aplicar cualquier cambio, comprueba la revisión de la misma instancia que se va a editar. Integra la consulta y el uso opcional de esa precondición en mundo-world. Conserva el resultado de aplicar lotes anteriores sin precondición y deja mundo e IDs intactos en caso de conflicto.",
+          "paths": [
+            "include/mundo/world.hpp",
+            "src/world_revision.cpp",
+            "include/mundo/document_digest.hpp",
+            "src/document_digest.cpp",
+            "tools/worldctl.cpp",
+            "CMakeLists.txt"
+          ],
+          "context": [
+            "src/world.cpp",
+            "src/world_file.cpp",
+            "include/mundo/document_file.hpp"
+          ]
+        },
+        {
+          "key": "archivos-02",
+          "title": "Reemplazar un mundo dentro de una copia nativa del proyecto",
+          "goal": "Añade una operación de proyecto que reemplace la revisión de un único mundo por ID estable y escriba el nuevo archivo .mproject de forma atómica. Conserva los demás documentos, campos de autor, portales y metadatos ajenos, incluidas las claves desconocidas admitidas por el lector. Recalcula tamaños y SHA-256 de las secciones afectadas, comprueba los límites y abre de nuevo el resultado con el lector existente antes de confirmar. Expón la operación desde mundo-world y protege el proyecto original en todo fallo.",
+          "paths": [
+            "include/mundo/project.hpp",
+            "src/project_file.cpp",
+            "include/mundo/document_file.hpp",
+            "src/document_file.cpp",
+            "tools/worldctl.cpp"
+          ],
+          "context": [
+            "web/project.js",
+            "src/project_metadata.cpp",
+            "src/private_file.hpp"
+          ]
+        },
+        {
+          "key": "plugins-02",
+          "title": "Conservar un perfil de plugins por proyecto en Studio",
+          "goal": "Permite guardar y recuperar los identificadores y versiones exactas elegidas por el autor para un proyecto. Al cambiar entre dos proyectos, resuelve sus perfiles por separado contra el catálogo local y muestra las dependencias ausentes o incompatibles. Conserva las referencias sin instalar contenido externo ni activar implícitamente una versión distinta. Proyectos históricos sin perfil, borradores, importación y exportación mantienen sus comportamientos.",
+          "paths": [
+            "web/project.js",
+            "web/plugin-registry.js",
+            "studio/plugin-panel.js",
+            "studio/project-panel.js",
+            "studio/Mundos.html"
+          ],
+          "context": [
+            "web/component-record.js",
+            "studio/editor.js"
+          ]
+        },
+        {
+          "key": "nucleo-05",
+          "title": "Deshacer y rehacer transacciones en la sesión nativa de edición",
+          "goal": "Define una sesión de edición nativa que use el motor de lotes para registrar un deshacer por lote aceptado. Limita el historial simultáneamente por entradas y por bytes, recupera jerarquía, propiedades y asignador de identificadores al deshacer/rehacer, y anula el futuro después de confirmar una edición diferente. Los lotes rechazados y los conflictos de revisión deben dejar intactos ambos historiales. Conecta deshacer y rehacer con un modo de edición de la CLI en una misma sesión. Conserva el formato del documento.",
+          "paths": [
+            "include/mundo/world.hpp",
+            "src/world.cpp",
+            "tools/worldctl.cpp"
+          ],
+          "context": [
+            "src/world_file.cpp",
+            "include/mundo/document_file.hpp"
+          ]
+        },
+        {
+          "key": "archivos-03",
+          "title": "Recuperar la revisión anterior de un proyecto local",
+          "goal": "Al actualizar un proyecto existente, ofrece conservar un número acotado de revisiones anteriores completas con su huella. Añade en mundo-world las operaciones de enumerar las revisiones y recuperar una revisión válida en un archivo nuevo sin sobrescribir la fuente. Las revisiones parciales o dañadas no se anuncian como recuperables. Una interrupción o un segundo escritor debe conservar al menos la última revisión válida que ya se hubiese publicado.",
+          "paths": [
+            "include/mundo/document_file.hpp",
+            "src/document_file.cpp",
+            "src/private_file.hpp",
+            "src/private_file.cpp",
+            "tools/worldctl.cpp"
+          ],
+          "context": [
+            "include/mundo/project.hpp",
+            "src/document_digest.cpp"
+          ]
+        },
+        {
+          "key": "plugins-03",
+          "title": "Revisar y revertir una actualización de plugin local",
+          "goal": "Añade una actualización explícita de manifiesto declarativo que muestre al propietario los cambios de versión, dependencias y plantillas. Comprueba los perfiles afectados antes de confirmar, conserva la versión anterior necesaria para abrir un proyecto y ofrece revertir la selección sin modificar datos de componentes ya colocados. La operación de catálogo debe ser atómica y las entradas incompatibles deben conservar su diagnóstico. Usa únicamente los manifiestos locales introducidos por el propietario.",
+          "paths": [
+            "web/plugin-registry.js",
+            "studio/plugin-panel.js",
+            "studio/Mundos.html",
+            "tools/pluginctl.cjs"
+          ],
+          "context": [
+            "web/project.js",
+            "studio/component-inspector.js",
+            "docs/PLUGINS.md"
+          ]
+        },
+        {
+          "key": "plugins-04",
+          "title": "Consultar las versiones de plugins de un proyecto desde el anfitrión nativo",
+          "goal": "Añade una consulta de solo lectura a la API nativa y a mundo-world project-plugins. Lee un .mproject y los manifiestos .mplugin declarativos locales que indique el propietario. Distingue un perfil heredado, un perfil vacío y las versiones fijadas. Informa qué versiones están disponibles y qué requisitos faltan o son incompatibles, con los mismos resultados que Studio ante los mismos archivos. Conserva los formatos históricos y los archivos originales. Verifica desde las entradas públicas de Studio y la CLI que la resolución coincide y que el proyecto preparado para jugar excluye los perfiles privados y los componentes de autoría.",
+          "paths": [
+            "include/mundo/project.hpp",
+            "src/project_file.cpp",
+            "tools/worldctl.cpp",
+            "CMakeLists.txt"
+          ],
+          "context": [
+            "src/project_metadata.hpp",
+            "src/project_metadata.cpp",
+            "include/mundo/document_file.hpp",
+            "web/plugin-registry.js",
+            "web/component-record.js",
+            "web/project.js",
+            "studio/plugin-panel.js",
+            "tools/pluginctl.cjs"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "modelos",
+      "title": "Importación de modelos y catálogo 3D",
+      "tasks": [
+        {
+          "key": "modelos-01",
+          "title": "Conservar las superficies declaradas en un OBJ",
+          "goal": "Recoge los cambios usemtl de un OBJ propio, asocia los intervalos de triángulos a nombres de superficie y guárdalos como metadatos opcionales del catálogo. Conserva los bytes e identidad de MWCMESH1. Un OBJ sin usemtl mantiene su superficie uniforme.",
+          "paths": [
+            "web/obj-import.js",
+            "studio/creator-assets.js"
+          ],
+          "context": [
+            "web/creator-mesh.js",
+            "studio/creator-model-panel.js"
+          ]
+        },
+        {
+          "key": "modelos-02",
+          "title": "Editar y guardar el material de una superficie",
+          "goal": "Añade al panel de modelos propios un selector de superficie, color base y rugosidad. Conserva los valores acotados en el proyecto y usa el color por instancia como valor heredado. Una importación anterior sigue abriendo con un material.",
+          "paths": [
+            "studio/creator-model-panel.js",
+            "studio/creator-assets.js",
+            "studio/Mundo_Studio.html"
+          ],
+          "context": [
+            "web/obj-import.js",
+            "web/project.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "fisica",
+      "title": "Física y vehículos",
+      "tasks": [
+        {
+          "key": "fisica-01",
+          "title": "Editar el freno del turismo en Studio",
+          "goal": "Añade un valor opcional de frenado de servicio al turismo compartido. Permite editarlo dentro de límites en el taller, conservarlo en la publicación y cargar un archivo anterior con el comportamiento anterior.",
+          "paths": [
+            "studio/vehicle.js",
+            "studio/vehicle-model.js",
+            "studio/Mundo_Studio.html",
+            "web/room-file.js"
+          ],
+          "context": [
+            "studio/publications.js",
+            "server/room-car.cjs"
+          ]
+        },
+        {
+          "key": "fisica-02",
+          "title": "Aplicar el freno publicado a la simulación de sala",
+          "goal": "Lee del paquete del anfitrión el valor de frenado autorizado. Úsalo en el paso de simulación del turismo y en la representación de estado para observadores. Cambiar de conductor conserva la configuración de la revisión y no permite valores enviados por el pasajero.",
+          "paths": [
+            "server/room-car.cjs",
+            "server/room-runtime.cjs",
+            "server/room-source.cjs"
+          ],
+          "context": [
+            "web/room-file.js",
+            "server/room-wire.cjs"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "render",
+      "title": "Gráficos, iluminación y materiales",
+      "tasks": [
+        {
+          "key": "render-01",
+          "title": "Separar distancia de detalle y resolución por perfil",
+          "goal": "Expón en los ajustes del motor dos parámetros independientes para la resolución de salida y la distancia del detalle geométrico. Persiste ajustes por clase móvil o PC y conserva los valores heredados. Integra la elección de detalle en la vista de la sala sin añadir un límite de FPS.",
+          "paths": [
+            "include/mundo/device_settings.hpp",
+            "src/device_settings.cpp",
+            "src/room_view.cpp"
+          ],
+          "context": [
+            "include/mundo/room_view.hpp",
+            "src/adaptive.cpp"
+          ]
+        },
+        {
+          "key": "render-02",
+          "title": "Editar y aplicar la iluminación de una escena",
+          "goal": "Añade dirección e intensidad finitas y acotadas de una luz de escena a la edición, la serialización y el visor compartido de Studio y MUNDO. Conserva la iluminación anterior como valor predeterminado. Reutiliza la transformación de normales y el material ya disponible.",
+          "paths": [
+            "web/experience-look.js",
+            "web/view.js",
+            "studio/preview.js",
+            "studio/Mundo_Studio.html"
+          ],
+          "context": [
+            "web/project.js",
+            "web/geometry.js",
+            "mundo/player.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "red",
+      "title": "Multijugador y servidor",
+      "tasks": [
+        {
+          "key": "red-01",
+          "title": "Numerar cambios de indicadores en el servidor",
+          "goal": "Asigna a cada cambio de indicador de la revisión un contador creciente y conserva una ventana acotada de novedades por plaza. Admite consultar novedades posteriores a un contador y devuelve una instantánea si el cursor ha quedado atrás. Usa la reserva autenticada y permisos existentes.",
+          "paths": [
+            "server/room-runtime.cjs",
+            "server/room.cjs"
+          ],
+          "context": [
+            "server/room-wire.cjs",
+            "server/room-recovery.cjs"
+          ]
+        },
+        {
+          "key": "red-02",
+          "title": "Restablecer el estado visible después de reconectar",
+          "goal": "Recupera en MUNDO web el cursor de novedades de su reserva. Ignora confirmaciones duplicadas, aplica la instantánea ante un salto y borra el cursor al cambiar de plaza o publicación. Actualiza el indicador visible con la autoridad de la sala.",
+          "paths": [
+            "mundo/room.js",
+            "mundo/player.js"
+          ],
+          "context": [
+            "server/room-runtime.cjs",
+            "mundo/entrada.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "clientes-nativos",
+      "title": "Clientes nativos de Windows, Android e iOS",
+      "tasks": [
+        {
+          "key": "modelos-nativos-01",
+          "title": "Leer la malla de autor en el núcleo nativo",
+          "goal": "Añade un lector C++ de MWCMESH1 que valide longitud, límites, dimensiones, posiciones, normales e índices antes de crear la malla del motor. Conserva el color por instancia y la caja del mundo. Reutiliza los tipos existentes del catálogo y sus límites. No compiles ni ejecutes programas, pruebas o benchmarks.",
+          "paths": [
+            "include/mundo/creator_mesh.hpp",
+            "src/creator_mesh.cpp",
+            "CMakeLists.txt"
+          ],
+          "context": [
+            "web/creator-mesh.js",
+            "include/mundo/appearance.hpp",
+            "include/mundo/assets.hpp"
+          ]
+        },
+        {
+          "key": "modelos-nativos-02",
+          "title": "Recibir una malla autorizada desde la plaza nativa",
+          "goal": "Integra en el cliente de sala común la oferta mesh-1, descarga con la reserva y revisión vigentes, longitud acotada, comprobación de SHA-256 completo y clave visual. Descarta resultados atrasados al cambiar de reserva. Mantén disponibles movimiento y sectores durante la descarga.",
+          "paths": [
+            "apps/room/room_client.hpp",
+            "apps/room/room_client.cpp",
+            "apps/room/room_http.hpp",
+            "apps/windows/room_http.cpp",
+            "apps/android/room_http.cpp",
+            "apps/ios/room_http.mm",
+            "apps/android/app/src/main/java/studio/mundo/player/RoomTransport.java"
+          ],
+          "context": [
+            "server/room.cjs",
+            "mundo/room-models.js",
+            "include/mundo/creator_mesh.hpp",
+            "docs/MODELOS_DE_CREADOR_052.md"
+          ]
+        },
+        {
+          "key": "modelos-nativos-03",
+          "title": "Dibujar una malla recibida en Windows, Android e iOS",
+          "goal": "Conecta la llegada y la liberación de geometría al catálogo del reproductor nativo en PC y a la sesión móvil compartida. Reutiliza la geometría entre instancias y conserva posición, color y aparición provisional. Entrega en código y registra qué queda pendiente de ejecución física.",
+          "paths": [
+            "apps/room/active_scene.cpp",
+            "src/room_view.cpp",
+            "apps/mobile/session.cpp",
+            "apps/mobile/session_room.cpp"
+          ],
+          "context": [
+            "apps/room/room_client.hpp",
+            "include/mundo/room_view.hpp",
+            "include/mundo/appearance.hpp",
+            "docs/MODELOS_DE_CREADOR_052.md"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "audio",
+      "title": "Audio",
+      "tasks": [
+        {
+          "key": "audio-01",
+          "title": "Mezclar una fuente de ambiente por distancia",
+          "goal": "Añade al reproductor web un ambiente sintetizado original de nivel regulable y atenuación por distancia a una fuente de escena. Activa el audio después de una interacción del jugador y libera el grafo al abandonar la sala. Al reingresar crea una sola instancia de audio.",
+          "paths": [
+            "mundo/scene-audio.js",
+            "mundo/player.js",
+            "mundo/MUNDO.html"
+          ],
+          "context": [
+            "mundo/room.js",
+            "mundo/walk.js"
+          ]
+        },
+        {
+          "key": "audio-02",
+          "title": "Colocar y publicar la fuente sonora desde Studio",
+          "goal": "Añade una fuente opcional de ambiente al editor con posición, radio y volumen. Conserva y valida sus datos en la revisión. Usa el mismo esquema para que el reproductor en línea mueva la fuente al lugar indicado por el creador.",
+          "paths": [
+            "studio/editor.js",
+            "studio/Mundo_Studio.html",
+            "web/room-file.js",
+            "studio/publications.js",
+            "mundo/scene-audio.js"
+          ],
+          "context": [
+            "web/project.js",
+            "mundo/player.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "contenido",
+      "title": "Empaquetado y diagnóstico",
+      "tasks": [
+        {
+          "key": "contenido-01",
+          "title": "Inventariar recursos por publicación y perfil",
+          "goal": "Genera al exportar una revisión un inventario determinista de identificadores de dependencia, bytes y nivel de detalle por perfil. Separa el contenido autorizado para las plazas del catálogo privado del dueño. Usa los tamaños de los recursos serializados disponibles.",
+          "paths": [
+            "studio/publications.js",
+            "web/room-file.js"
+          ],
+          "context": [
+            "studio/creator-assets.js",
+            "web/creator-mesh.js"
+          ]
+        },
+        {
+          "key": "contenido-02",
+          "title": "Mostrar al anfitrión el contenido de su revisión",
+          "goal": "En el panel administrativo local muestra el recuento de recursos y bytes por perfil del inventario guardado. Identifica recursos opcionales sin atribuirles mediciones de FPS. Para publicaciones anteriores muestra el inventario como no disponible.",
+          "paths": [
+            "server/host-panel.cjs",
+            "server/panel/index.html",
+            "server/panel/panel.js"
+          ],
+          "context": [
+            "server/room-source.cjs",
+            "web/room-file.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "editor",
+      "title": "Editor de MUNDO Studio",
+      "tasks": [
+        {
+          "key": "editor-01",
+          "title": "Guardar una selección nombrada de objetos",
+          "goal": "Añade a Studio grupos nombrados de identificadores de instancia para recuperar selecciones frecuentes. Integra guardar, renombrar y recuperar en el proyecto actual. Impide que una referencia de otra escena cambie la selección.",
+          "paths": [
+            "studio/editor.js",
+            "studio/tools.js",
+            "studio/Mundo_Studio.html"
+          ],
+          "context": [
+            "web/project.js",
+            "studio/project-panel.js"
+          ]
+        },
+        {
+          "key": "editor-02",
+          "title": "Trasladar y deshacer un grupo como operación única",
+          "goal": "Permite mover una selección nombrada con un único desplazamiento relativo en el editor. Reutiliza el historial de edición, conserva las separaciones y vuelve a seleccionar el grupo en deshacer y rehacer. Omite identificadores ya retirados.",
+          "paths": [
+            "studio/editor.js",
+            "studio/tools.js"
+          ],
+          "context": [
+            "studio/Mundo_Studio.html",
+            "web/world.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "animacion",
+      "title": "Personajes y animación",
+      "tasks": [
+        {
+          "key": "animacion-01",
+          "title": "Mezclar los ciclos de reposo y marcha de un esqueleto",
+          "goal": "Integra en el rig existente una mezcla continua de reposo y marcha controlada por la velocidad planar de la instancia. Mantén el tiempo por actor y el estado sentado independiente. Aplica la mezcla a las articulaciones de la vista compartida.",
+          "paths": [
+            "web/people-rig.js",
+            "mundo/avatar.js",
+            "mundo/online-people.js"
+          ],
+          "context": [
+            "web/geometry.js"
+          ]
+        },
+        {
+          "key": "animacion-02",
+          "title": "Llevar la mezcla de marcha al avatar nativo",
+          "goal": "Expón en la pose nativa un peso continuo de marcha derivado de velocidad y delta temporal. Mantén la pose de pasajeros, interpola al desmontar y conecta la pose al dibujo de personas de la sala.",
+          "paths": [
+            "include/mundo/avatar.hpp",
+            "src/avatar.cpp",
+            "src/room_view.cpp"
+          ],
+          "context": [
+            "web/people-rig.js",
+            "include/mundo/room_view.hpp"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "secuencias",
+      "title": "Efectos, cámaras y cinemáticas",
+      "tasks": [
+        {
+          "key": "secuencias-01",
+          "title": "Editar una toma con dos cámaras en Studio",
+          "goal": "Añade al editor una toma con dos fotogramas clave para posición y orientación, duración positiva y previsualización con interpolación. Al cerrar, restaura la cámara de trabajo; conserva la toma en el proyecto sin afectar mapas antiguos.",
+          "paths": [
+            "studio/preview.js",
+            "studio/Mundo_Studio.html",
+            "studio/editor.js",
+            "web/project.js"
+          ],
+          "context": [
+            "web/view.js"
+          ]
+        },
+        {
+          "key": "secuencias-02",
+          "title": "Reproducir la toma al entrar a la sala",
+          "goal": "Incluye la toma opcional en la publicación y reproduce la cámara al ingresar con una plaza válida. Proporciona una acción para omitirla, devuelve el control al jugador al finalizar y cancela cualquier toma de una revisión anterior.",
+          "paths": [
+            "web/room-file.js",
+            "studio/publications.js",
+            "mundo/room.js",
+            "mundo/player.js",
+            "mundo/MUNDO.html"
+          ],
+          "context": [
+            "web/project.js",
+            "web/view.js"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "terreno",
+      "title": "Terrenos y mundos grandes",
+      "tasks": [
+        {
+          "key": "terreno-01",
+          "title": "Delimitar regiones de detalle en el editor",
+          "goal": "Permite definir una región de detalle por coordenadas de celda, nombrarla y guardarla en el proyecto de Studio. Acota el área, conserva la geometría existente y enlaza el selector de región con la vista del mapa.",
+          "paths": [
+            "studio/district-panel.js",
+            "studio/Mundo_Studio.html",
+            "web/project.js"
+          ],
+          "context": [
+            "web/zones.js",
+            "studio/grid-panel.js"
+          ]
+        },
+        {
+          "key": "terreno-02",
+          "title": "Evitar recargas repetidas en un límite de sector",
+          "goal": "Integra en el gestor nativo de sectores dos distancias de entrada y salida para retener sectores cercanos al borde. Aplica los presupuestos de memoria existentes, libera en orden y descarta solicitudes de una revisión anterior.",
+          "paths": [
+            "apps/room/sector_stream.cpp",
+            "apps/room/sector_stream.hpp"
+          ],
+          "context": [
+            "apps/room/cell_directory.hpp",
+            "apps/room/room_client.hpp",
+            "src/visibility.cpp"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "reglas",
+      "title": "Reglas de juego, interfaz y programación visual",
+      "tasks": [
+        {
+          "key": "reglas-01",
+          "title": "Crear una regla visual de entrada a una zona",
+          "goal": "Incorpora al editor una regla declarativa y finita: al entrar por primera vez en una zona de esta escena, activar un indicador con clave local. Vincula los selectores a la zona y a la entidad del proyecto; conserva la regla al guardar. Los mapas previos tienen una lista vacía.",
+          "paths": [
+            "studio/editor.js",
+            "studio/Mundo_Studio.html",
+            "web/project.js"
+          ],
+          "context": [
+            "web/zones.js",
+            "studio/project-panel.js"
+          ]
+        },
+        {
+          "key": "reglas-02",
+          "title": "Aplicar la regla en la sala del anfitrión",
+          "goal": "Incluye las reglas en la revisión y evalúa entradas desde la posición que ya acepta el servidor. Mantén el indicador por plaza y por revisión y expón el estado al reproductor en línea. Limita las acciones a las declaradas, sin evaluar código recibido.",
+          "paths": [
+            "studio/publications.js",
+            "web/room-file.js",
+            "server/room-runtime.cjs",
+            "server/room.cjs",
+            "mundo/room.js"
+          ],
+          "context": [
+            "web/project.js",
+            "web/zones.js"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -28,7 +28,7 @@ function newActor(definition) {
     throw new Error("Definición de NPC inválida.");
   }
   return {id, mode, points: points.map(p => p.slice()), speed, waitTicks: Math.ceil(waitSeconds / STEP),
-    index: points.length > 1 ? 1 : 0, feet: null, yaw: 0, state: "idle", seat: null,
+    index: points.length > 1 ? 1 : 0, feet: null, yaw: 0, state: "idle", reason: null, seat: null,
     key: "", route: null, cursor: 0, target: null, retry: 0, dwell: 0, completed: false, budget: 384};
 }
 
@@ -73,6 +73,8 @@ class NpcSimulation {
   spawn(actor, obstacles) {
     actor.feet = this.navigation.project(actor.points[0], {obstacles});
     actor.retry = actor.feet ? this.tick : this.tick + 20;
+    actor.reason = actor.feet ? null : "spawn";
+    actor.state = actor.feet ? "idle" : "blocked";
     if (actor.feet && actor.mode === "patrol" && actor.points.length > 1) {
       actor.dwell = this.tick + actor.waitTicks;
       actor.state = actor.waitTicks ? "waiting" : "patrol";
@@ -117,6 +119,8 @@ class NpcSimulation {
     const key = behavior + "/" + (player ? player.id : actor.index);
     if (actor.key !== key) {
       actor.key = key;
+      actor.reason = null;
+      actor.state = "waiting";
       actor.route = null;
       actor.target = null;
       actor.completed = false;
@@ -126,6 +130,7 @@ class NpcSimulation {
     const obstacles = this.obstaclesFor(actor, solids, players, player?.id);
     if (player && distance(actor.feet, goal) <= STOP && this.navigation.canTraverse(actor.feet, goal, {obstacles})) {
       actor.state = "idle";
+      actor.reason = null;
       actor.route = null;
       actor.completed = false;
       return false;
@@ -141,6 +146,7 @@ class NpcSimulation {
       planned = true;
       if (result.status !== "ok" || !result.points.length) {
         actor.state = "blocked";
+        actor.reason = ["unreachable", "budget", "invalid"].includes(result.status) ? result.status : "invalid";
         actor.retry = this.tick + 20;
         if (result.status === "budget") actor.budget = Math.min(3072, actor.budget * 2);
         return planned;
@@ -156,6 +162,7 @@ class NpcSimulation {
     // and the other agents. A newly blocked segment invalidates the old route.
     const motionObstacles = player ? [...obstacles, bodyBox(player.position)] : obstacles;
     actor.state = behavior;
+    actor.reason = null;
     let remaining = actor.speed * STEP;
     while (remaining > EPSILON && actor.cursor < actor.route.length) {
       const next = actor.route[actor.cursor];
@@ -188,6 +195,7 @@ class NpcSimulation {
   block(actor) {
     actor.route = null;
     actor.state = "blocked";
+    actor.reason = "obstacle";
     actor.retry = this.tick + 5;
   }
 
@@ -202,6 +210,11 @@ class NpcSimulation {
       actor.state = "idle";
       actor.retry = this.tick + 10;
     }
+  }
+
+  inspect() {
+    // Owner diagnostics also include actors which could not enter the world.
+    return this.actors.map(a => ({id: a.id, position: a.feet?.slice() ?? null, state: a.state, reason: a.reason}));
   }
 
   snapshot() {

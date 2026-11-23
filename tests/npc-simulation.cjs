@@ -141,3 +141,26 @@ test("authored identities, limits and coordinates are validated before publicati
   tick(solo,50);
   assert.deepEqual(solo.snapshot(),[{id:"9007199254740993",position:[1,0,1],yaw:0,state:"idle"}]);
 });
+
+test("host inspection includes spawn and planning failures, cleared on recovery and absent on the wire", () => {
+  const nav=plane(), blocker={min:[-1,-1,-1],max:[1,2,1]};
+  const sim=new NpcSimulation(nav, [route()], {obstacles:[blocker]});
+  assert.deepEqual(sim.snapshot(),[]);
+  assert.deepEqual(sim.inspect(),[{id:"9007199254740993",position:null,state:"blocked",reason:"spawn"}]);
+  const plan=nav.plan;
+  nav.plan=()=>({status:"unreachable",points:[]});
+  tick(sim, 21);
+  assert.equal(sim.inspect()[0].reason,"unreachable");
+  assert.equal(sim.snapshot()[0].state,"blocked");
+  assert.ok(!Object.hasOwn(sim.snapshot()[0],"reason"));
+  nav.plan=plan;
+  tick(sim, 20);
+  assert.equal(sim.inspect()[0].reason,null);
+  assert.equal(sim.inspect()[0].state,"patrol");
+  sim.inspect()[0].position.fill(123);
+  assert.ok(pos(sim)[0]<2);
+
+  const dynamic={min:[.4,0,-1],max:[1,2,1]};
+  tick(sim,1,{obstacles:[dynamic]});
+  assert.equal(sim.inspect()[0].reason,"obstacle");
+});

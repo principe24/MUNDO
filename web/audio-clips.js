@@ -89,12 +89,16 @@ globalThis.MundoAudioClips = (() => {
     return out;
   }
   function encodeMono(samples){
-    check(samples.length>=1 && samples.length<=maxFrames,"Grabación fuera del límite por fuente.");
+    check(Number.isInteger(samples?.length) && samples.length>=1 && samples.length<=maxFrames,"Grabación fuera del límite por fuente.");
     const b=new Uint8Array(44+samples.length*2),v=new DataView(b.buffer);
     ascii(b,0,"RIFF");v.setUint32(4,b.length-8,true);ascii(b,8,"WAVEfmt ");v.setUint32(16,16,true);
     v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);
     v.setUint16(32,2,true);v.setUint16(34,16,true);ascii(b,36,"data");v.setUint32(40,samples.length*2,true);
-    for(let i=0;i<samples.length;i++)v.setInt16(44+2*i,Math.max(-32768,Math.min(32767,Math.round(samples[i]*32768))),true);
+    for(let i=0;i<samples.length;i++){
+      const value=samples[i];
+      check(Number.isFinite(value),"La muestra de salida debe ser finita.");
+      v.setInt16(44+2*i,Math.max(-32768,Math.min(32767,Math.round(value*32768))),true);
+    }
     return b;
   }
   async function digest(bytes){
@@ -107,7 +111,8 @@ globalThis.MundoAudioClips = (() => {
     return {key:keyOf(hash),digest:hash,bytes};
   }
   async function verify(key,input,expected){
-    const bytes=canonical(input), hash=await digest(bytes);
+    // The caller may edit or recycle the input while the asynchronous digest runs.
+    const bytes=new Uint8Array(canonical(input)), hash=await digest(bytes);
     check(keyOf(hash)===key && (expected===undefined || expected===hash),"La grabación no coincide con su huella.");
     return decode(bytes);
   }
@@ -133,17 +138,27 @@ globalThis.MundoAudioClips = (() => {
     const b=new Uint8Array(16+room.length+36*items.length+total),v=new DataView(b.buffer);
     ascii(b,0,"MWAUDIO1");v.setUint32(8,room.length,true);v.setUint32(12,items.length,true);b.set(room,16);
     let at=16+room.length,previous="";
+    const entries=[];
+    // Freeze payloads and metadata before the first asynchronous hash. The bank
+    // itself holds the snapshot, so validating it requires no second payload copy.
     for(const item of items){
-      const bytes=canonical(item.bytes),hash=await digest(bytes);
-      check(keyOf(hash)===item.key && item.key>previous && (!item.digest || item.digest===hash),"Conflicto en el catálogo de sonidos.");
-      for(let j=0;j<32;j++)b[at+j]=parseInt(hash.slice(j*2,j*2+2),16);
-      v.setUint32(at+32,bytes.length,true);at+=36;b.set(bytes,at);at+=bytes.length;previous=item.key;
+      const bytes=canonical(item.bytes), key=item.key;
+      check(typeof key==="string" && /^s[0-9a-f]{16}$/.test(key) && key>previous,"Conflicto en el catálogo de sonidos.");
+      const header=at;
+      v.setUint32(at+32,bytes.length,true);at+=36;b.set(bytes,at);
+      entries.push({key,digest:item.digest,header,bytes:b.subarray(at,at+bytes.length)});
+      at+=bytes.length;previous=key;
+    }
+    for(const item of entries){
+      const hash=await digest(item.bytes);
+      check(keyOf(hash)===item.key && (item.digest===undefined || item.digest===hash),"Conflicto en el catálogo de sonidos.");
+      for(let j=0;j<32;j++)b[item.header+j]=parseInt(hash.slice(j*2,j*2+2),16);
     }
     return b;
   }
   function match(sources,items){
     const keys=new Set(sources.map(s=>s.preset).filter(p=>/^s[0-9a-f]{16}$/.test(p)));
-    check(keys.size===items.length && items.every(item=>keys.has(item.key)),"Las grabaciones deben corresponder exactamente a las fuentes de la sala.");
+    check(keys.size===items.length && items.every(item=>keys.delete(item.key)) && keys.size===0,"Las grabaciones deben corresponder exactamente a las fuentes de la sala.");
   }
   return Object.freeze({decode,canonical,encodeMono,prepare,verify,pack,unpack,match,maxClipBytes,maxRoomBytes,maxBankBytes,rate});
 })();

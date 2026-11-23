@@ -29,19 +29,25 @@ function newActor(definition) {
   }
   return {id, mode, points: points.map(p => p.slice()), speed, waitTicks: Math.ceil(waitSeconds / STEP),
     index: points.length > 1 ? 1 : 0, feet: null, yaw: 0, state: "idle", reason: null, seat: null,
-    key: "", route: null, cursor: 0, target: null, retry: 0, dwell: 0, completed: false, budget: 384};
+    resume: null, remainingDwell: 0, rejected: new Map(), key: "", route: null, cursor: 0, target: null, retry: 0, dwell: 0, completed: false, budget: 384};
 }
 
-function choosePlayer(actor, players) {
+function choosePlayer(actor, players, tick) {
   const home = actor.points[0];
-  const current = players.find(p => p.id === actor.seat);
+  // A temporarily unreachable companion must not monopolize a follower when
+  // another seat is nearby on the same floor. Retry if its location changes.
+  const eligible = players.filter(p => {
+    const rejection = actor.rejected.get(p.id);
+    return !rejection || tick >= rejection.until || distance(p.position, rejection.goal) > .55;
+  });
+  const current = eligible.find(p => p.id === actor.seat);
   // Retain the current seat until it leaves the larger radius. A newcomer cannot
   // cause two followers to change their minds each time player positions cross.
   if (current && distance(home, current.position) <= LEASH && distance(actor.feet, current.position) <= LEASH) {
     return current;
   }
   let winner = null, best = NOTICE;
-  for (const p of players) {
+  for (const p of eligible) {
     const d = distance(actor.feet, p.position);
     if (distance(home, p.position) <= LEASH && (d < best || (d === best && (!winner || p.id < winner.id)))) {
       winner = p;
@@ -65,7 +71,10 @@ class NpcSimulation {
 
   obstaclesFor(actor, solids, players, except = null) {
     const list = solids.slice();
-    for (const other of this.actors) if (other !== actor && other.feet) list.push(bodyBox(other.feet));
+    for (const other of this.actors) {
+      const occupied = other.feet ?? other.resume;
+      if (other !== actor && occupied) list.push(bodyBox(occupied));
+    }
     for (const p of players) if (p.id !== except) list.push(bodyBox(p.position));
     return list;
   }
@@ -104,7 +113,18 @@ class NpcSimulation {
 
   step(actor, players, solids, canPlan) {
     if (!actor.feet) {
-      if (this.tick >= actor.retry) this.spawn(actor, this.obstaclesFor(actor, solids, players));
+      if (this.tick >= actor.retry) {
+        const obstacles = this.obstaclesFor(actor, solids, players);
+        if (!actor.resume) this.spawn(actor, obstacles);
+        else if (this.navigation.canTraverse(actor.resume, actor.resume, {obstacles})) {
+          actor.feet = actor.resume;
+          actor.resume = null;
+          actor.dwell = this.tick + actor.remainingDwell;
+          actor.state = actor.remainingDwell ? "waiting" : "idle";
+          actor.remainingDwell = 0;
+          actor.reason = null;
+        } else actor.retry = this.tick + 5;
+      }
       return false;
     }
     if (actor.dwell > this.tick) return false;
@@ -112,7 +132,7 @@ class NpcSimulation {
       actor.state = "idle";
       return false;
     }
-    const player = actor.mode === "follow" ? choosePlayer(actor, players) : null;
+    const player = actor.mode === "follow" ? choosePlayer(actor, players, this.tick) : null;
     actor.seat = player?.id ?? null;
     const behavior = actor.mode === "patrol" ? "patrol" : player ? "follow" : "return";
     const goal = player ? player.position : actor.points[behavior === "patrol" ? actor.index : 0];
@@ -149,6 +169,9 @@ class NpcSimulation {
         actor.reason = ["unreachable", "budget", "invalid"].includes(result.status) ? result.status : "invalid";
         actor.retry = this.tick + 20;
         if (result.status === "budget") actor.budget = Math.min(3072, actor.budget * 2);
+        if (player && ["unreachable", "invalid"].includes(result.status)) {
+          actor.rejected.set(player.id, {goal: player.position.slice(), until: this.tick + 40});
+        }
         return planned;
       }
       actor.route = result.points;
@@ -210,6 +233,70 @@ class NpcSimulation {
       actor.state = "idle";
       actor.retry = this.tick + 10;
     }
+  }
+
+  checkpoint() {
+    return {version: 1, actors: this.actors.map(actor => ({
+      id: actor.id, position: (actor.feet ?? actor.resume)?.slice() ?? null, yaw: actor.yaw,
+      index: actor.index, wait: actor.resume ? actor.remainingDwell : Math.max(0, actor.dwell - this.tick)
+    }))};
+  }
+
+  prepareCheckpoint(data, obstacles) {
+    if (!data || data.version !== 1 || Object.keys(data).length !== 2 ||
+        !Array.isArray(data.actors) || data.actors.length !== this.actors.length ||
+        !Array.isArray(obstacles)) return null;
+    const byId = new Map(this.actors.map(actor => [actor.id, actor]));
+    const staged = [], occupied = [];
+    for (const row of data.actors) {
+      const source = byId.get(row?.id);
+      if (!source || !row || Object.keys(row).length !== 5 ||
+          !Number.isFinite(row.yaw) || Math.abs(row.yaw) > Math.PI ||
+          !Number.isInteger(row.index) || row.index < 0 || row.index >= source.points.length ||
+          !Number.isInteger(row.wait) || row.wait < 0 || row.wait > source.waitTicks ||
+          (source.mode === "follow" && row.wait !== 0)) return null;
+      byId.delete(row.id);
+      // Preserve configuration but release every ephemeral target, path and seat.
+      const actor = {...source, feet: null, resume: null, remainingDwell: 0, rejected: new Map(),
+        key: "", route: null, cursor: 0, target: null, seat: null, completed: false, budget: 384,
+        index: row.index, yaw: row.yaw, retry: this.tick, dwell: 0, reason: null, state: "idle"};
+      if (row.position === null) {
+        if (row.wait !== 0) return null;
+        actor.state = "blocked";
+        actor.reason = "spawn";
+      } else {
+        const feet = row.position;
+        if (!point(feet) || !this.navigation.canTraverse(feet, feet, {obstacles: occupied})) return null;
+        occupied.push(bodyBox(feet));
+        if (obstacles.length && !this.navigation.canTraverse(feet, feet, {obstacles})) {
+          actor.resume = feet.slice();
+          actor.remainingDwell = row.wait;
+          actor.state = "blocked";
+          actor.reason = "obstacle";
+        } else {
+          actor.feet = feet.slice();
+          actor.dwell = this.tick + row.wait;
+          actor.state = row.wait ? "waiting" : "idle";
+        }
+      }
+      staged.push(actor);
+    }
+    // Tick priority follows authored order regardless of checkpoint row order.
+    const restored = new Map(staged.map(a => [a.id, a]));
+    return this.actors.map(a => restored.get(a.id));
+  }
+
+  canRestore(data, {obstacles = []} = {}) {
+    return this.prepareCheckpoint(data, obstacles) !== null;
+  }
+
+  restore(data, {obstacles = []} = {}) {
+    const actors = this.prepareCheckpoint(data, obstacles);
+    if (!actors) return false;
+    this.actors = actors;
+    this.remainder = 0;
+    this.first = 0;
+    return true;
   }
 
   inspect() {

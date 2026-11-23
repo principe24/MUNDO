@@ -5,7 +5,15 @@ const { privateIPv4, roomNetwork } = require("./room.cjs");
 
 function choices() {
   const addresses = new Map([["127.0.0.1", "Solo este equipo"]]);
-  for (const [name, entries] of Object.entries(os.networkInterfaces())) {
+  // A sandbox can allow loopback sockets while denying network enumeration.
+  // Keep the local administrative workflow available in that environment.
+  let interfaces;
+  try { interfaces = os.networkInterfaces(); }
+  catch (error) {
+    if (!["ERR_SYSTEM_ERROR","EPERM","EACCES"].includes(error.code)) throw error;
+    interfaces = {};
+  }
+  for (const [name, entries] of Object.entries(interfaces)) {
     for (const item of entries || []) {
       if (!item.internal && privateIPv4(item.address))
         addresses.set(item.address, name + " · " + item.address);

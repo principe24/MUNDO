@@ -35,7 +35,7 @@ function readRoomSource(filename, data) {
   if (data.length < 24 || data.length > byteLimit(filename)) throw Error("Tamaño de archivo incompatible.");
   if (path.extname(filename).toLowerCase() === ".mroomaudio") {
     const {room,items}=audioRoom.unpack(data);
-    const source=readRoomSource("revision.mroom",room);
+    const source=readRoomSource(audioRoom.hasModels(room)?"revision.mroom3d":"revision.mroom",room);
     const {MundoWorld}=require("./room-runtime.cjs");
     audioRoom.match(audioScene.read(MundoWorld.decode(source.bytes)),items);
     const audioClips=new Map();

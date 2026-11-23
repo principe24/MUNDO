@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const {test} = require("node:test");
-const {mount, save, open} = require("./support/studio-dom.cjs");
+const {mount, save, open, until} = require("./support/studio-dom.cjs");
 const {MundoProject:P} = require("../server/room-runtime.cjs");
 const scene = require("../web/audio-scene.js");
 
@@ -108,7 +108,8 @@ function audioStudio() {
     }
   }
   const audioHost={AudioContext,setInterval:()=>1,clearInterval(){}};
-  return {...mount({},{audioDatabase,audioHost}),contexts,data};
+  const models={stores:new Map(),version:0}, modelDatabase=memoryDatabase(models);
+  return {...mount({},{audioDatabase,audioHost,modelDatabase}),contexts,data,models};
 }
 
 function namedBlob(bytes,name) {
@@ -172,4 +173,73 @@ test("WAV del catálogo a PCM estéreo y sala privada recuperable, con cancelaci
   assert(fresh.contexts.at(-1).nodes.some(n=>n.buffer.getChannelData(0).some(v=>Math.abs(v)>.005)));
   fresh.events.get("pagehide")();
   assert.equal(fresh.contexts.at(-1).state,"closed");
+});
+
+test("consentimiento independiente de mallas en sala con audio, restauración y lectura del anfitrión",async()=>{
+  const fs=require("node:fs"), path=require("node:path");
+  const {readRoomSource}=require("../server/room-source.cjs");
+  const ModelRoom=require("../web/model-room.js");
+  const studio=audioStudio(), el=studio.element;
+  el("new").click();
+  // Author one real OBJ instance through Studio, then bring in a private recording.
+  const modelBytes=fs.readFileSync(path.join(__dirname,"../examples/modelos/Baliza_de_taller.obj"));
+  el("creatorFile").files=[namedBlob(modelBytes,"Baliza privada.obj")];
+  el("creatorFile").onchange();
+  await until("importación de malla",()=>!el("creatorFile").disabled);
+  assert.match(el("catalogObject").value,/^creator:c/);
+  el("addCatalogObject").click();
+  const pcm=Float32Array.from({length:600},(_,i)=>.4*Math.cos(i/9));
+  const input=el("audioWav");
+  input.files=[namedBlob(clips.encodeMono(pcm),"grabación local.wav")];
+  await input.onchange({target:input});
+  el("audioCreate").click();
+  async function exportRoom() {
+    const before=studio.getDownload();
+    await el("audioExport").click();
+    const download=studio.getDownload();
+    assert.notEqual(download,before,el("audioStatus").textContent);
+    assert.equal(download.name,"Mi_mundo.mroomaudio");
+    return new Uint8Array(await download.blob.arrayBuffer());
+  }
+  const plain=await exportRoom();
+  const source=readRoomSource("solo.mroomaudio",plain);
+  assert.equal(Buffer.from(plain.subarray(0,8)).toString(),"MWAUDIO1");
+  assert.equal(source.models,undefined);assert.equal(source.audioClips.size,1);
+
+  el("audioExportModels").checked=true;
+  const combined=await exportRoom();
+  assert.equal(el("audioExportModels").checked,false);
+  assert.equal(Buffer.from(combined.subarray(0,8)).toString(),"MWAUDIO2");
+  const hosted=readRoomSource("juntas.mroomaudio",combined);
+  assert.equal(hosted.models.size,1);assert.equal(hosted.audioClips.size,1);
+  assert.deepEqual(hosted.bytes,source.bytes);
+  assert.equal(hosted.publicationHash,source.publicationHash);
+  assert(!Buffer.from(combined).includes("grabación local"));
+  async function openCombined(page,bytes) {
+    const input=page.element("inputFile");
+    input.files=[namedBlob(bytes,"juntas.mroomaudio")];
+    await input.onchange({target:input});
+  }
+  const unpacked=clips.unpack(combined);
+  const meshes=ModelRoom.unpack(unpacked.room);
+  const corruptMesh=combined.slice(), corruptAudio=combined.slice(), wrongVersion=combined.slice();
+  corruptMesh[meshes.items[0].bytes.byteOffset+meshes.items[0].bytes.length-1]^=1;
+  corruptAudio[corruptAudio.length-1]^=1;
+  wrongVersion[7]=49;
+  for(const damaged of [corruptMesh,corruptAudio,wrongVersion]) {
+    assert.throws(()=>readRoomSource("cambiada.mroomaudio",damaged));
+    const page=audioStudio();
+    await openCombined(page,damaged);
+    assert.doesNotMatch(page.element("notice").textContent,/abierta como borrador/);
+    assert.equal(page.data.stores.get("recordings")?.size||0,0);
+    assert.equal(page.models.stores.get("models")?.size||0,0);
+  }
+  const restored=audioStudio();
+  await openCombined(restored,combined);
+  assert.match(restored.element("notice").textContent,/abierta como borrador/);
+  assert.equal(restored.models.stores.get("models").size,1);
+  assert.equal(restored.data.stores.get("recordings").size,1);
+  assert.equal(restored.element("audioSource").options.length,2);
+  if(process.env.MUNDO_STUDIO_AUDIO_FIXTURE)
+    fs.writeFileSync(process.env.MUNDO_STUDIO_AUDIO_FIXTURE,combined,{flag:"wx"});
 });

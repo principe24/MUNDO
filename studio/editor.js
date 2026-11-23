@@ -328,6 +328,7 @@
   };
   function refresh(practice){
     invalidateZones();
+    el("audioExportModels").checked=false;
     el("experienceLook").value=MundoExperienceLook.read(world)||"";
     if(!world.nodes.has(selection))selection=null;
     setMarking(false);view.setWorld(world);creatorModels.setWorld(world);el("worldTitle").textContent=el("worldName").value||"Mi mundo";
@@ -732,12 +733,14 @@
     try{
       if(meetingError || gridError)throw Error(meetingError || gridError);
       const snapshot=W.fork(world),title=el("worldName").value.trim()||"Mi mundo",root=vehicleRoot,point=meetingPoint?.slice()??null;
-      const packed=await MundoPublications.audioDraft(snapshot,title,root,point);
+      const includeModels=el("audioExportModels").checked;
+      const packed=await MundoPublications.audioDraft(snapshot,title,root,point,includeModels);
       const url=URL.createObjectURL(packed.blob),link=document.createElement("a");
       try{
         link.href=url;link.download=packed.filename;document.body.append(link);link.click();
       }finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
       message.textContent="Descarga solicitada: "+packed.filename+".";
+      el("audioExportModels").checked=false;
     }catch(error){message.textContent=error.message;}
     finally{button.disabled=false;}
   };

@@ -250,7 +250,8 @@
           <div class="actions"><label>General (%)<input id="audioMaster" type="number" min="0" max="100" value="100"></label><label>Ambiente (%)<input id="audioAmbience" type="number" min="0" max="100" value="100"></label></div>
           <div class="actions"><label>Efectos (%)<input id="audioEffects" type="number" min="0" max="100" value="100"></label><label>Música (%)<input id="audioMusic" type="number" min="0" max="100" value="100"></label><label>Voces (%)<input id="audioVoices" type="number" min="0" max="100" value="100"></label></div>
         </details>
-        <button type="button" id="audioExport">Exportar sala con los sonidos seleccionados (.mroomaudio)</button>
+        <label><input type="checkbox" id="audioExportModels" autocomplete="off"> Incluir los modelos 3D de mi catálogo usados en esta sala</label>
+        <button type="button" id="audioExport">Exportar sala con los sonidos seleccionados</button>
         <p>Al exportar autorizas incluir los archivos de audio usados en este mundo. Los demás sonidos se quedan en tu catálogo.</p>
         <p id="audioStatus" role="status" aria-live="polite"></p>
       </details></section>

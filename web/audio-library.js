@@ -73,9 +73,21 @@ globalThis.MundoAudioLibrary = (() => {
     if(input instanceof Blob && input.size>MundoAudioClips.maxRoomBytes)throw Error("Archivo de sala demasiado grande.");
     return input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : new Uint8Array(input);
   }
+  async function readBase(base) {
+    const models=MundoAudioClips.hasModels(base)?MundoModelRoom.unpack(base):null;
+    const room=models?models.room:base;
+    const info=await MundoRoomFile.verify(room),world=MundoWorld.decode(info.world);
+    if(models){
+      MundoModelRoom.match(world,models.items);
+      for(const item of models.items){
+        if(await MundoRoomFile.digest(item.bytes)!==item.digest)throw Error("La malla adjunta difiere de su huella.");
+      }
+    }
+    return {room,world,info,models};
+  }
   async function packRoom(input) {
-    const room=await contents(input),info=await MundoRoomFile.verify(room);
-    const sources=MundoAudioScene.read(MundoWorld.decode(info.world));
+    const base=await contents(input),{world}=await readBase(base);
+    const sources=MundoAudioScene.read(world);
     const keys=new Set(sources.map(s=>s.preset).filter(MundoAudioScene.isClip));
     const items=[];
     for(const key of keys){
@@ -84,11 +96,11 @@ globalThis.MundoAudioLibrary = (() => {
       items.push(item);
     }
     MundoAudioClips.match(sources,items);
-    return MundoAudioClips.pack(room,items);
+    return MundoAudioClips.pack(base,items);
   }
   async function openRoom(input) {
-    const {room,items}=MundoAudioClips.unpack(await contents(input));
-    const info=await MundoRoomFile.verify(room),world=MundoWorld.decode(info.world);
+    const {room:base,items}=MundoAudioClips.unpack(await contents(input));
+    const {room,info,world,models}=await readBase(base);
     const sources=MundoAudioScene.read(world);
     MundoAudioClips.match(sources,items);
     const pending=[];
@@ -96,8 +108,11 @@ globalThis.MundoAudioLibrary = (() => {
       await MundoAudioClips.verify(item.key,item.bytes,item.digest);
       pending.push({...item,name:sources.find(s=>s.preset===item.key).label});
     }
+    // Both content-addressed sets have been verified before either private catalog is updated.
+    // The catalogs use separate databases. On a quota error it is safe to retry either import.
+    if(models)await MundoCreatorAssets.restore(models.items);
     await save(pending);
-    return {room,info,world};
+    return {room,info,world,hasModels:Boolean(models)};
   }
   return Object.freeze({list,get,importFile,packRoom,openRoom});
 })();

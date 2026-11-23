@@ -1,8 +1,14 @@
 "use strict";
-window.MundoNpcPanel = function({edit,world,redraw,mark}) {
+window.MundoNpcPanel = function({edit,world,terrain,redraw,mark}) {
   const api=MundoNpcRoutes, el=id=>document.getElementById(id), status=el("navStatus");
   const routes=el("navRoute"), points=el("navPoint"), npcs=el("navNpc");
-  let data={routes:[],npcs:[]};
+  let data={routes:[],npcs:[]},activeCheck=null;
+  const check=el("navCheck"),report=el("navReport");
+  function invalidate(){
+    activeCheck=null;
+    check.textContent="Comprobar recorrido guardado";
+    report.textContent="";
+  }
   const route=()=>data.routes.find(r=>r.id===routes.value);
   const npc=()=>data.npcs.find(n=>n.id===npcs.value);
   const coordinates=()=>["X","Y","Z"].map(axis=>el("nav"+axis).valueAsNumber);
@@ -22,6 +28,7 @@ window.MundoNpcPanel = function({edit,world,redraw,mark}) {
     el("navAppend").disabled=!r || steps.length>=api.maxPoints;
     el("navMove").disabled=!r;
     el("navDeleteRoute").disabled=!r || data.npcs.some(n=>n.route===r.id);
+    check.disabled=!npc();
     el("navCreateNpc").disabled=!r || data.npcs.length>=api.maxActors;
     el("navCreateRoute").disabled=data.routes.length>=api.maxRoutes;
     el("navUpdateNpc").disabled=el("navMoveNpc").disabled=el("navDeleteNpc").disabled=!npc();
@@ -36,7 +43,7 @@ window.MundoNpcPanel = function({edit,world,redraw,mark}) {
     el("navWait").value=n.waitSeconds;
   }
   function refresh(wantedRoute=routes.value,wantedNpc=npcs.value,wantedPoint=points.value){
-    data=api.inspect(world());
+    invalidate();data=api.inspect(world());
     routes.replaceChildren(...data.routes.map(r=>new Option(r.label+" · "+r.id,r.id)));
     if(data.routes.some(r=>r.id===wantedRoute)) routes.value=wantedRoute;
     npcs.replaceChildren(new Option("Nuevo personaje",""),...data.npcs.map(n=>new Option(n.label+" · "+n.id,n.id)));
@@ -57,7 +64,7 @@ window.MundoNpcPanel = function({edit,world,redraw,mark}) {
   }
   routes.onchange=()=>{refreshPoints();redraw();};
   points.onchange=()=>{refreshPoints();const s=route()?.steps[points.selectedIndex];if(s)locate(s.point);redraw();};
-  npcs.onchange=()=>{fillNpc();refreshPoints();if(npc())locate(npc().spawn);redraw();};
+  npcs.onchange=()=>{invalidate();fillNpc();refreshPoints();if(npc())locate(npc().spawn);redraw();};
   el("navCreateRoute").onclick=()=>change(next=>api.addRoute(next,el("navRouteName").value.trim(),[coordinates()]),
     "Ruta creada.",id=>refresh(id,""));
   el("navDeleteRoute").onclick=()=>change(next=>{api.removeRoute(next,routes.value);return null;},"Ruta retirada.");
@@ -75,6 +82,21 @@ window.MundoNpcPanel = function({edit,world,redraw,mark}) {
     "Ruta y conducta guardadas.");
   el("navMoveNpc").onclick=()=>change(next=>api.updateNpc(next,npcs.value,{...npc(),spawn:coordinates()}),"Origen del personaje actualizado.");
   el("navDeleteNpc").onclick=()=>change(next=>{next.nodes.delete(BigInt(npcs.value));return null;},"Personaje retirado.");
+  check.onclick=async()=>{
+    if(activeCheck){invalidate();report.textContent="Comprobación cancelada.";return;}
+    const selected=npc();
+    if(!selected) return;
+    const ticket=Symbol(),getCurrent=()=>activeCheck===ticket;
+    activeCheck=ticket; check.textContent="Cancelar comprobación";
+    report.textContent="Preparando la geometría de la sala…";
+    try{
+      const result=await MundoNpcPreflight.check({world:world(),terrain:terrain(),npc:selected,
+        route:data.routes.find(r=>r.id===selected.route),current:getCurrent,
+        progress:text=>{if(getCurrent()) report.textContent=text;}});
+      if(getCurrent()) report.textContent=result;
+    }catch(e){if(getCurrent()) report.textContent=e.message;}
+    finally{if(getCurrent()){activeCheck=null;check.textContent="Comprobar recorrido guardado";}}
+  };
   el("navPick").onclick=mark;
   el("navPanel").ontoggle=redraw;
   function overlays(){
@@ -105,5 +127,5 @@ window.MundoNpcPanel = function({edit,world,redraw,mark}) {
     for(const n of data.npcs) marker(n.spawn,.45,1.4,[.28,.4,1]);
     return out;
   }
-  return {refresh,locate,overlays,marking(mode){el("navPick").setAttribute("aria-pressed",String(mode==="nav-position"));}};
+  return {refresh,invalidate,locate,overlays,marking(mode){el("navPick").setAttribute("aria-pressed",String(mode==="nav-position"));}};
 };

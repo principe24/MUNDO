@@ -28,9 +28,7 @@ function makeRoomCar(world,scene,seats,{MundoDriving,MundoMeeting,MundoBrumaLook
   const aboard=id=>id===driver||id===passenger;
   let chassis;
   function refreshBounds(){
-    const c=Math.abs(Math.cos(car.yaw)),s=Math.abs(Math.sin(car.yaw));
-    const rx=c*car.width+s*car.length,rz=s*car.width+c*car.length;
-    chassis={chassis:true,min:[car.x-rx,car.base,car.z-rz],max:[car.x+rx,car.top,car.z+rz]};
+    chassis=MundoDriving.chassisBounds(car);
   }
   const walking=car?withBoxes(road,()=>[chassis]):road;
   if(car){

@@ -136,7 +136,7 @@
       }
     }
   });
-  const navPanel=MundoNpcPanel({edit,world:()=>world,redraw:()=>renderMeeting(),mark:()=>{
+  const navPanel=MundoNpcPanel({edit,world:()=>world,terrain:()=>({scene:view.scene,vehicleRoot}),redraw:()=>renderMeeting(),mark:()=>{
     setMarking(marking==="nav-position"?false:"nav-position");
     if(marking){say("Toca una superficie para elegir las coordenadas. Escape cancela.");canvas.focus({preventScroll:true});}
   }});
@@ -297,6 +297,7 @@
     renderMeeting();
   }
   vehicleChoice.onchange=()=>{
+    navPanel.invalidate();
     const previous=record();
     vehicleRoot=vehicleChoice.value||null;
     invalidateZones();

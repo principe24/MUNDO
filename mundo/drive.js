@@ -229,5 +229,10 @@ window.MundoDriving=(()=>{
     if(pose)Object.assign(car,pose);
     return {car,road,grid:pose};
   }
-  return {discover,roomCars,roomCar,gridSpawn,roomStart};
+  function chassisBounds(car){
+    const c=Math.abs(Math.cos(car.yaw)),s=Math.abs(Math.sin(car.yaw));
+    const rx=c*car.width+s*car.length,rz=s*car.width+c*car.length;
+    return {chassis:true,min:[car.x-rx,car.base,car.z-rz],max:[car.x+rx,car.top,car.z+rz]};
+  }
+  return {discover,roomCars,roomCar,gridSpawn,roomStart,chassisBounds};
 })();

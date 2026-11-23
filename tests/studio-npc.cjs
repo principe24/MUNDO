@@ -1,7 +1,7 @@
 "use strict";
 const assert=require("node:assert/strict");
 const {test}=require("node:test");
-const {mount,save,open}=require("./support/studio-dom.cjs");
+const {mount,save,open,until}=require("./support/studio-dom.cjs");
 const api=require("../server/room-runtime.cjs");
 const {MundoWorld:W,MundoProject:P}=api;
 const R=require("../web/room-file.js");
@@ -80,4 +80,31 @@ test("Studio permite crear dos paradas, cambiar la conducta, deshacer y reabrir 
   assert.equal(again.element("navMode").value,"follow");
   assert.equal(again.element("navX").value,"1");
   assert.equal(again.element("navPoint").options.length,2);
+});
+
+test("diagnóstico en Studio localiza el tramo y la cota, permite editar y cancela el informe anterior",async()=>{
+  const page=mount({}),el=page.element;el("new").click();page.block.click();
+  el("positionY").value="-.2";el("sizesX").value="14";el("sizesY").value=".4";el("sizesZ").value="8";
+  el("props").onsubmit({preventDefault(){}});
+  el("navX").value="-4";el("navCreateRoute").click();
+  el("navX").value="4";el("navAppend").click();
+  el("navX").value="0";el("navCreateNpc").click();
+  async function check(){
+    const job=el("navCheck").click();
+    await until("informe de navegación",()=>el("navCheck").textContent==="Comprobar recorrido guardado");
+    await job;return el("navReport").textContent;
+  }
+  assert.match(await check(),/3 tramos transitables/);
+  el("navPoint").selectedIndex=1;el("navPoint").onchange();el("navY").value="7";el("navMove").click();
+  assert.match(await check(),/Sin paso transitable en punto 1 → punto 2 .*Y 7/);
+  const pending=el("navCheck").click();await el("navCheck").click();
+  // The DOM adapter unrefs timers, while a browser always has a live event loop.
+  await new Promise(resolve=>setTimeout(resolve,10));await pending;
+  assert.match(el("navReport").textContent,/cancelada/);
+  const stale=el("navCheck").click();el("undo").click();
+  await new Promise(resolve=>setTimeout(resolve,10));await stale;
+  assert.equal(el("navReport").textContent,"");
+  assert.match(await check(),/3 tramos transitables/);
+  el("navMode").value="follow";el("navUpdateNpc").click();
+  assert.match(await check(),/Origen transitable/);
 });

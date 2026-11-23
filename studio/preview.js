@@ -16,8 +16,11 @@
     const title = (state.project?.name || state.title || "Mi mundo").trim();
     const name = title.replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0,65) || "Mundo";
     if (state.project) {
-      const result=await MundoAudioProject.exportProject(state.project,state.includeAudio?MundoAudioLibrary.get:null);
-      return {blob:result.blob,filename:name+(result.hasAudio?".mprojectaudio":".mproject")};
+      const result=state.includeAudio
+        ?await MundoAudioMusicProject.exportProject(state.project,MundoAudioLibrary.get,MundoAudioLibrary.getMusic)
+        :await MundoAudioProject.exportProject(state.project,null);
+      const extension=result.hasMusic?".mprojectmusic":result.hasAudio?".mprojectaudio":".mproject";
+      return {blob:result.blob,filename:name+extension};
     }
     const bytes = MundoWorld.encode(state.world);
     const info = {title, revision:1, vehicleRoot:state.vehicleRoot ?? null,

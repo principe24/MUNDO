@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const {MundoWorld:W,MundoProject:P} = require("../server/room-runtime.cjs");
 const Clips = require("../web/audio-clips.js"), Scene = require("../web/audio-scene.js");
 const Pack = require("../web/audio-project.js");
+const MusicProject = require("../web/audio-music-project.js");
 const {mount,until,open:openStudio} = require("./support/studio-dom.cjs");
 const {memoryDatabase} = require("./support/creator-database.cjs");
 
@@ -110,4 +111,18 @@ test("Studio recibe el proyecto entero, restaura el catálogo y prepara la revis
   const clean=mountStudio();clean.element("projectFile").files=[new Blob([damaged])];clean.element("projectFile").onchange();
   await until("validación previa a la escritura",()=>/huella/.test(clean.element("projectStatus").textContent));
   assert.equal(clean.data.stores.get("recordings")?.size || 0,0);
+});
+
+test("Studio abre, restaura y vuelve a exportar un proyecto con música larga",async()=>{
+  const track=await Clips.prepareMusic(Clips.encodeMono(new Float32Array(Clips.rate*13).fill(.18)));
+  const world=W.empty();Scene.setMusic(world,{streamId:track.id,label:"Paseo del puerto",loop:true});
+  const project={name:"Puerto musical",start:1,worlds:[await P.draft(1,world,"Puerto",null,null)]};
+  const exported=await MusicProject.exportProject(project,null,id=>id===track.id?track:null);
+  const original=await bytes(exported.blob),studio=mountStudio(),el=studio.element;
+  await openStudio(studio,new Blob([original]),project.name);
+  assert.equal(studio.data.stores.get("music-catalog").size,1);
+  assert.equal(studio.data.stores.get("music-segments").size,1);
+  await el("projectSaveAudio").click();
+  assert.equal(studio.getDownload().name,"Puerto_musical.mprojectmusic",el("projectStatus").textContent);
+  assert.deepEqual(await bytes(studio.getDownload().blob),original);
 });

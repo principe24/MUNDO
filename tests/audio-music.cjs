@@ -80,3 +80,22 @@ test("the player keeps a two-segment window, refills in order and cancels on roo
   link.audioMusicOffered=false;stream.update();assert.ok(cancelled>=1);
   assert.ok(calls.every(call=>call.route==="music-info"||call.body.revision===revision));
 });
+
+test("the project player scopes music to the confirmed route and accepts a silent world",async()=>{
+  const prepared=await Clips.prepareMusic(wav(1)),lease="c".repeat(32),calls=[];
+  const manifest=[lease,prepared.id,"once",prepared.segments.length,...prepared.segments.map(item=>item.digest)].join("\n")+"\n";
+  const link={audioMusicOffered:true,project:true,lease,waiting:false,
+    route:{phase:0,world:1,revision:"1".repeat(64),epoch:3},scene:{route:{world:1,revision:"1".repeat(64),epoch:3}},
+    async call(route,body){calls.push({route,body});if(route==="music-info"&&body.revision==="1".repeat(64))return new Response(null,{status:204});
+      if(route==="music-info")return new Response(manifest);const item=prepared.segments[body.index];
+      return new Response(item.bytes,{headers:{"content-type":"audio/wav","x-mundo-audio-digest":item.digest,
+        "x-mundo-music-index":String(item.index)}});}};
+  let buffered=0,begins=0;
+  const audio={get bufferedMusicSegments(){return buffered;},beginMusicStream(){begins++;buffered=0;return true;},
+    queueMusicSegment(){buffered++;return true;},cancelMusicStream(){buffered=0;return true;}};
+  const stream=Player.roomMusic(link,audio,Clips,async response=>new Uint8Array(await response.arrayBuffer()),()=>{});
+  await stream.update();await stream.update();assert.equal(calls.length,1);assert.equal(begins,0);
+  link.route={phase:0,world:2,revision:"2".repeat(64),epoch:4};link.scene={route:{...link.route}};
+  await stream.update();await stream.update();assert.equal(begins,1);assert.equal(buffered,1);
+  assert.deepEqual(calls.map(item=>item.route),["music-info","music-info","music"]);
+});

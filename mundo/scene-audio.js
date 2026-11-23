@@ -190,13 +190,17 @@ globalThis.MundoPlayerAudio = (() => {
     let scope=null,manifest=null,flight=null,retryAt=0,failures=0,reported="";
     function status(message){if(message!==reported){reported=message;report(message);}}
     function admitted(){
-      if(!link.audioMusicOffered||!link.lease||link.project)return null;
-      return link.revision?{revision:link.revision,lease:link.lease}:null;
+      if(!link.audioMusicOffered||!link.lease)return null;
+      if(!link.project)return link.revision?{revision:link.revision,lease:link.lease}:null;
+      const route=link.route,scene=link.scene?.route;
+      if(link.waiting||!route||route.phase===1||!scene||route.world!==scene.world||
+         route.revision!==scene.revision||route.epoch!==scene.epoch)return null;
+      return {revision:route.revision,lease:link.lease,epoch:route.epoch,world:route.world};
     }
-    const same=(a,b)=>a&&b&&a.revision===b.revision&&a.lease===b.lease;
+    const same=(a,b)=>a&&b&&a.revision===b.revision&&a.lease===b.lease&&a.world===b.world&&a.epoch===b.epoch;
     function stopFlight(){flight?.abort();flight=null;}
     function reset(){
-      stopFlight();if(manifest)audio.cancelMusicStream(manifest.id);
+      stopFlight();if(manifest?.id)audio.cancelMusicStream(manifest.id);
       manifest=null;retryAt=0;failures=0;status("");
     }
     function clear(){reset();scope=null;}
@@ -225,8 +229,10 @@ globalThis.MundoPlayerAudio = (() => {
       const current=()=>flight===controller&&scope===ticket&&same(admitted(),ticket);
       const timeout=setTimeout(()=>controller.abort(),15000);
       async function work(){
+        if(manifest?.empty)return;
         if(!manifest){
           const response=await link.call("music-info",{revision:ticket.revision},null,controller.signal,true);
+          if(response.status===204){if(current()){manifest={empty:true};failures=0;retryAt=0;status("");}return;}
           const nextManifest=parse(await response.text(),ticket);
           if(!current())return;
           manifest=nextManifest;audio.beginMusicStream(manifest.id,0);failures=0;retryAt=0;status("");

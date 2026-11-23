@@ -10,20 +10,21 @@ globalThis.MundoAudioProject = (() => {
   const maxBytes = 16+64*1024*1024+clips.maxBankBytes+36*16;
 
   async function inventory(index) {
-    const sourcesByWorld = new Map(), names = new Map();let hasMusic=false;
+    const sourcesByWorld = new Map(), musicByWorld = new Map(), names = new Map();let hasMusic=false;
     for (const entry of index.worlds) {
       const world=(await P.load(entry)).world,sources=scene.read(world);
-      hasMusic ||= Boolean(scene.readMusic(world));
+      const music=scene.readMusic(world);
+      hasMusic ||= Boolean(music);musicByWorld.set(entry.id,music);
       sourcesByWorld.set(entry.id,sources);
       for (const source of sources) {
         if (scene.isClip(source.preset) && !names.has(source.preset)) names.set(source.preset,source.label);
       }
       if (names.size > 16) throw Error("El proyecto admite hasta 16 grabaciones distintas.");
     }
-    return {sourcesByWorld,names,hasMusic};
+    return {sourcesByWorld,musicByWorld,names,hasMusic};
   }
 
-  async function inspect(project) {
+  async function inspect(project,{allowMusic=false}={}) {
     const index = await P.open(new Blob([project]));
     // Compare the serialized projection, including its manifest hash. This also
     // rejects unexpected metadata that a guest reader would otherwise ignore.
@@ -31,7 +32,7 @@ globalThis.MundoAudioProject = (() => {
     if (guest.length !== project.length || !guest.every((byte,i) => byte===project[i]))
       throw Error("Exporta una copia para invitados antes de incluir las grabaciones.");
     const details=await inventory(index);
-    if(details.hasMusic)throw Error("La música larga de proyectos requiere el siguiente formato de publicación.");
+    if(details.hasMusic&&!allowMusic)throw Error("La música larga de proyectos requiere el formato .mprojectmusic.");
     return {index,...details};
   }
 
@@ -50,26 +51,27 @@ globalThis.MundoAudioProject = (() => {
     return bytes;
   }
 
-  async function open(input) {
+  async function open(input,options) {
     // Own a bounded snapshot until verification and any catalog transaction finish.
     const view = input instanceof Uint8Array ? input : new Uint8Array(input);
     if (view.length > maxBytes) throw Error("El proyecto con grabaciones supera el tamaño admitido.");
-    const data = unpack(new Uint8Array(view)), details = await inspect(data.project);
+    const data = unpack(new Uint8Array(view)), details = await inspect(data.project,options);
     match(details.names,data.items);
     for (const item of data.items) {
       await clips.verify(item.key,item.bytes,item.digest);
       item.name = details.names.get(item.key);
     }
-    return {index:details.index,sourcesByWorld:details.sourcesByWorld,items:data.items};
+    return {index:details.index,sourcesByWorld:details.sourcesByWorld,musicByWorld:details.musicByWorld,
+      hasMusic:details.hasMusic,items:data.items};
   }
 
-  async function exportProject(index,getClip) {
+  async function exportSnapshot(index,getClip,{allowMusic=false}={}) {
     // Capture immutable entries, portal definitions and the title before the first await.
     const blob = await P.packForRoom(index);
     const guest = await P.open(blob);
-    const {names,hasMusic} = await inventory(guest);
-    if(hasMusic)throw Error("La exportación de música larga para proyectos sigue pendiente. Exporta una sala musical individual.");
-    if (!names.size) return {blob,hasAudio:false};
+    const details=await inventory(guest),{names,hasMusic}=details;
+    if(hasMusic&&!allowMusic)throw Error("La música larga de proyectos requiere el formato .mprojectmusic.");
+    if (!names.size) return {blob,hasAudio:false,details};
     if (!getClip) throw Error("Autoriza las grabaciones referenciadas para preparar este proyecto.");
     const items = [];
     let total = 0;
@@ -82,8 +84,13 @@ globalThis.MundoAudioProject = (() => {
     }
     const project = new Uint8Array(await blob.arrayBuffer());
     const bytes = await clips.packProjectBank(project,items);
-    return {blob:new Blob([bytes],{type:"application/vnd.mundo.audio-project"}),hasAudio:true};
+    return {blob:new Blob([bytes],{type:"application/vnd.mundo.audio-project"}),hasAudio:true,
+      details};
   }
-  return Object.freeze({pack,unpack,open,inventory,exportProject,maxBytes});
+  async function exportProject(index,getClip){
+    const result=await exportSnapshot(index,getClip);
+    return {blob:result.blob,hasAudio:result.hasAudio};
+  }
+  return Object.freeze({pack,unpack,open,inspect,inventory,exportSnapshot,exportProject,maxBytes});
 })();
 if (typeof module!=="undefined" && module.exports) module.exports=globalThis.MundoAudioProject;

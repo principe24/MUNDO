@@ -209,7 +209,7 @@ window.MundoProjectPanel = function({captureDraft, selectedPublication, beginEdi
       const accept = index => !worlds.length || window.confirm("¿Abrir «" + index.name + "» y sustituir la colección actual del proyecto?");
       const magic = await file.slice(0,8).text();
       let next;
-      if (magic === "MPRAUD01") {
+      if (magic === "MPRAUD01" || magic === "MPMUSIC1") {
         next = await MundoAudioLibrary.openProject(file,accept);
         if (!next) return;
       } else {
@@ -237,9 +237,9 @@ window.MundoProjectPanel = function({captureDraft, selectedPublication, beginEdi
     download(shareFile || await MundoProject.pack(project),fileName(project.name));
   });
   el("projectSaveAudio").onclick = () => run(async () => {
-    const project = current(), result = await MundoAudioProject.exportProject(project,MundoAudioLibrary.get);
-    if (!result.hasAudio) throw Error("Añade una fuente con un WAV importado para exportar sus grabaciones.");
-    download(result.blob,fileName(project.name,".mprojectaudio"));
+    const project = current(), result = await MundoAudioMusicProject.exportProject(project,MundoAudioLibrary.get,MundoAudioLibrary.getMusic);
+    if (!result.hasAudio&&!result.hasMusic) throw Error("Añade una grabación o música larga para exportar el audio del proyecto.");
+    download(result.blob,fileName(project.name,result.hasMusic?".mprojectmusic":".mprojectaudio"));
   });
   MundoPrepararSala(el("projectPlay"),()=>{
     if(busy || !worlds.length)throw Error("Añade un mundo al proyecto.");

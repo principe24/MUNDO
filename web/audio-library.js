@@ -182,13 +182,19 @@ globalThis.MundoAudioLibrary = (() => {
     return {room,info,world,hasModels:Boolean(models)};
   }
   async function openProject(file,accept) {
-    if (!(file instanceof Blob) || file.size > MundoAudioProject.maxBytes)
+    if (!(file instanceof Blob) || file.size > MundoAudioMusicProject.maxBytes)
       throw Error("Archivo de proyecto con audio demasiado grande.");
-    const loaded=await MundoAudioProject.open(new Uint8Array(await file.arrayBuffer()));
+    const bytes=new Uint8Array(await file.arrayBuffer()),magic=String.fromCharCode(...bytes.subarray(0,8));
+    const loaded=magic===MundoAudioMusicProject.magic
+      ?await MundoAudioMusicProject.open(bytes):await MundoAudioProject.open(bytes);
     if (!accept(loaded.index)) return null;
-    // All maps, hashes and references have been verified; write the complete sound
-    // inventory in a single IndexedDB transaction before replacing the open project.
-    await save(loaded.items);
+    // Verify the complete package before updating either content-addressed catalog.
+    // A quota failure is safe to retry because an existing digest is immutable.
+    if(loaded.items.length)await save(loaded.items);
+    for(const stream of loaded.streams??[]){
+      const marker=[...loaded.musicByWorld.values()].find(item=>item?.streamId===stream.id);
+      await restoreMusic(stream,marker?.label||"Música del mundo");
+    }
     return loaded.index;
   }
   return Object.freeze({list,get,importFile,listMusic,getMusic,importMusicFile,restoreMusic,packMusicRoom,packRoom,openRoom,openProject});

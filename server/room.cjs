@@ -517,6 +517,20 @@ async function roomFromSource(source){
       if(referenced.size!==source.audioClips.size)throw Error("Hay grabaciones ajenas al proyecto.");
       session.audioClips=source.audioClips;
     }
+    if(source.musicStreams){
+      const {MundoWorld}=require("./room-runtime.cjs"),audioScene=require("../web/audio-scene.js");
+      const referenced=new Set();session.musicByRevision=new Map();
+      for(const def of project.worlds.values()){
+        const marker=audioScene.readMusic(MundoWorld.decode(def.bytes));
+        if(!marker)continue;
+        const stream=source.musicStreams.get(marker.streamId);
+        if(!stream)throw Error("Falta una pista musical de un mundo del proyecto.");
+        session.musicByRevision.set(def.revision,{...stream,loop:marker.loop,label:marker.label});
+        referenced.add(marker.streamId);
+      }
+      if(referenced.size!==source.musicStreams.size)throw Error("Hay pistas musicales ajenas al proyecto.");
+      session.musicStreams=source.musicStreams;
+    }
     return session;
   }
   const hash=source.publicationHash??createHash("sha256").update(source.bytes).digest("hex");
@@ -541,7 +555,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
   const brumaPackage=shareBruma===true?require("./bruma-package.cjs").readBruma():null;
   const modelRevision=creatorModels?.size && !room.project ? room.revision : null;
   const offersRecordings=Boolean(room.audioClips?.size);
-  const offersMusic=Boolean(room.musicStream?.segments?.length);
+  const offersMusic=Boolean(room.musicStream?.segments?.length||room.musicStreams?.size);
   const entries=new EntryDelivery(room);
   const sectors=new SectorDelivery(room,entries.zones);
   const assets=new Map(files.map(file=>{
@@ -683,7 +697,8 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
         if(!offersMusic)return send(url==="/room/music-info"?204:404,"");
         if(!data||typeof data!=="object"||Array.isArray(data))fail(400,"Solicitud de música inválida.");
         if(data.revision!==room.revision)fail(409,"La revisión musical cambió.");
-        const stream=room.musicStream;
+        const stream=room.project?room.musicByRevision?.get(room.revision):room.musicStream;
+        if(!stream)return send(url==="/room/music-info"?204:404,"");
         if(url==="/room/music-info"){
           if(Object.keys(data).length!==1)fail(400,"Solicitud de inventario musical inválida.");
           const body=[p.lease,stream.id,stream.loop?"loop":"once",stream.segments.length,

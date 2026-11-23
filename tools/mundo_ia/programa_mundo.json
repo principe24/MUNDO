@@ -42,6 +42,7 @@
           "paths": [
             "web/audio-clips.js",
             "web/audio-music.js",
+            "web/audio-music-project.js",
             "web/audio-dsp.js",
             "web/audio-library.js",
             "studio/audio-panel.js",

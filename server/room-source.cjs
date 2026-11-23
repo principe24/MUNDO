@@ -7,6 +7,7 @@ const modelRoom = require("../web/model-room.js");
 
 const audioRoom = require("../web/audio-clips.js");
 const audioMusic = require("../web/audio-music.js");
+const audioMusicProject = require("../web/audio-music-project.js");
 const audioScene = require("../web/audio-scene.js");
 
 function openRoomSource(filename) {
@@ -29,6 +30,7 @@ function openRoomSource(filename) {
 
 function byteLimit(filename) {
   const ext=path.extname(filename).toLowerCase();
+  if(ext===".mprojectmusic")return audioMusicProject.maxBytes;
   if(ext===".mroommusic")return audioMusic.maxBytes;
   if(ext===".mprojectaudio")return require("../web/audio-project.js").maxBytes;
   return ext===".mroomaudio" ? audioRoom.maxRoomBytes : ext===".mroom3d" ? modelRoom.maxBytes : ext===".mproject" ? 64*1024*1024 : ext===".mroom" ? roomFile.maxBytes : 24*1024*1024;
@@ -36,6 +38,24 @@ function byteLimit(filename) {
 
 function readRoomSource(filename, data) {
   if (data.length < 24 || data.length > byteLimit(filename)) throw Error("Tamaño de archivo incompatible.");
+  if(path.extname(filename).toLowerCase()===".mprojectmusic"){
+    const {base,streams}=audioMusicProject.unpack(data),magic=Buffer.from(base.subarray(0,8)).toString("ascii");
+    const source=readRoomSource(magic==="MPRAUD01"?"revision.mprojectaudio":"revision.mproject",Buffer.from(base));
+    const musicStreams=new Map();
+    for(const stream of streams){
+      const digests=[];
+      for(const item of stream.segments){
+        if(createHash("sha256").update(item.bytes).digest("hex")!==item.digest)
+          throw Error("Un segmento musical del proyecto no coincide con su huella.");
+        digests.push(item.digest);
+      }
+      const digest=createHash("sha256").update("MUNDO/music/v1\n"+digests.join("\n")+"\n").digest("hex");
+      const id=String(BigInt("0x"+digest.slice(0,16))||1n);
+      if(stream.id!==id||stream.digest!==digest)throw Error("Una pista del proyecto no coincide con su inventario.");
+      musicStreams.set(id,{id,digest,segments:stream.segments});
+    }
+    return {...source,musicStreams};
+  }
   if(path.extname(filename).toLowerCase()===".mroommusic"){
     const {base,stream}=audioMusic.unpack(data),magic=Buffer.from(base.subarray(0,8)).toString("ascii");
     const nested=magic.startsWith("MWAUDIO")?"revision.mroomaudio":magic==="MROOM3D1"?"revision.mroom3d":"revision.mroom";

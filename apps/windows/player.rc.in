@@ -1,0 +1,87 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include "@MUNDO_ROOT@/apps/windows/resources.h"
+
+IDR_MATERIAL RCDATA "@CMAKE_CURRENT_BINARY_DIR@/surface.filamat"
+@owner_resource_data@
+IDR_MAIN_MENU MENU
+BEGIN
+    POPUP "&Mundo"
+    BEGIN
+        MENUITEM "Primera o tercera persona\tF3", ID_THIRD_PERSON
+        MENUITEM "&Controles\tF1", ID_HELP_KEYS
+        MENUITEM SEPARATOR
+        MENUITEM "&Salir", ID_EXIT_PLAYER
+    END
+#ifdef MUNDO_WINDOWS_OWNER_PLAYER
+    POPUP "&Propietario"
+    BEGIN
+        MENUITEM "Realismo del turismo\tF4", ID_OWNER_STYLE
+    END
+#endif
+    POPUP "&Sala"
+    BEGIN
+        MENUITEM "&Entrar con invitación...\tF6", ID_ROOM_JOIN
+        MENUITEM "Volver al &punto de encuentro...\tF7", ID_ROOM_MEETING, GRAYED
+        MENUITEM "&Salir de la sala\tMayús+F6", ID_ROOM_LEAVE, GRAYED
+    END
+    POPUP "&Audio"
+    BEGIN
+        MENUITEM "&Niveles de audio...\tF8", ID_AUDIO_MENU
+        MENUITEM "&Silenciar todo\tF9", ID_AUDIO_TOGGLE
+    END
+    POPUP "&Pantalla"
+    BEGIN
+        MENUITEM "&Ajustes de la partida...\tEsc", ID_VIDEO_MENU
+        MENUITEM "Pantalla &completa\tF11", ID_FULLSCREEN
+    END
+END
+
+IDD_VIDEO DIALOGEX 0, 0, 228, 143
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Ajustes de la partida · PC"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "Resolución interna máxima", -1, 10, 10, 98, 12
+    COMBOBOX ID_RESOLUTION, 116, 8, 100, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Detalle gráfico", -1, 10, 35, 98, 12
+    COMBOBOX ID_DETAIL, 116, 32, 100, 74, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Límite de FPS", -1, 10, 59, 98, 12
+    EDITTEXT ID_FPS, 116, 56, 100, 15, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "0 = sin limitador interno. Se conserva el perfil de esta PC.", -1, 10, 83, 204, 22
+    PUSHBUTTON "Predeterminados", ID_DEFAULTS, 10, 118, 66, 16
+    DEFPUSHBUTTON "Guardar", IDOK, 90, 118, 58, 16
+    PUSHBUTTON "Cancelar", IDCANCEL, 158, 118, 58, 16
+END
+
+IDD_ROOM_JOIN DIALOGEX 0, 0, 264, 89
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Entrar a una sala privada"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "Pega el enlace de invitación que te dio el anfitrión.", -1, 10, 10, 243, 12
+    EDITTEXT ID_ROOM_INVITE, 10, 29, 244, 15, ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+    DEFPUSHBUTTON "Entrar", IDOK, 115, 61, 65, 17
+    PUSHBUTTON "Cancelar", IDCANCEL, 188, 61, 66, 17
+END
+
+IDD_AUDIO DIALOGEX 0, 0, 228, 175
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Audio de la partida · PC"
+FONT 9, "Segoe UI"
+BEGIN
+    AUTOCHECKBOX "&Silenciar todo", ID_AUDIO_MUTE, 10, 8, 100, 14, WS_TABSTOP
+    LTEXT "Volumen &general (%)", -1, 10, 29, 115, 12
+    EDITTEXT ID_AUDIO_MASTER, 140, 26, 65, 15, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "Am&biente (%)", -1, 10, 51, 115, 12
+    EDITTEXT ID_AUDIO_AMBIENCE, 140, 48, 65, 15, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "&Efectos (%)", -1, 10, 73, 115, 12
+    EDITTEXT ID_AUDIO_EFFECTS, 140, 70, 65, 15, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "&Música (%)", -1, 10, 95, 115, 12
+    EDITTEXT ID_AUDIO_MUSIC, 140, 92, 65, 15, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "&Voces (%)", -1, 10, 117, 115, 12
+    EDITTEXT ID_AUDIO_VOICES, 140, 114, 65, 15, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    PUSHBUTTON "Predeterminados", ID_DEFAULTS, 10, 147, 66, 16
+    DEFPUSHBUTTON "Guardar", IDOK, 90, 147, 58, 16
+    PUSHBUTTON "Cancelar", IDCANCEL, 158, 147, 58, 16
+END

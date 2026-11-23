@@ -50,6 +50,7 @@ struct Player {
 #ifdef MUNDO_WINDOWS_OWNER_PLAYER
     bool owner_realism{};
 #endif
+    DeviceAudioProfile audio_profile;
     room::Client connection;
     std::optional<RoomPlay> online;
     bool third_person{true};
@@ -87,6 +88,7 @@ std::wstring wide_text(const std::string& utf8) {
     return result;
 }
 void room_menus(Player& p) {
+    CheckMenuItem(p.menu,ID_AUDIO_TOGGLE,MF_BYCOMMAND|(p.audio_profile.settings().muted?MF_CHECKED:MF_UNCHECKED));
     EnableMenuItem(p.menu,ID_ROOM_JOIN,MF_BYCOMMAND|(p.online?MF_GRAYED:MF_ENABLED));
     EnableMenuItem(p.menu,ID_ROOM_LEAVE,MF_BYCOMMAND|(p.online?MF_ENABLED:MF_GRAYED));
     EnableMenuItem(p.menu,ID_ROOM_MEETING,MF_BYCOMMAND|
@@ -148,6 +150,7 @@ bool enter_room(Player& p,std::wstring_view invitation) {
     if(p.online || !p.connection.start(invitation))return false;
     auto& online=p.online.emplace();
     online.third_person=p.third_person;
+    online.audio.set_levels(p.audio_profile.settings());
     release_controls_before_reuse(p);
 #ifdef MUNDO_WINDOWS_OWNER_PLAYER
     if(p.surface)p.surface->show_owner_vehicle_art(p.owner_realism);
@@ -267,6 +270,58 @@ INT_PTR CALLBACK video_dialog(HWND dialog, UINT event, WPARAM w, LPARAM l) {
     return FALSE;
 }
 
+constexpr std::array<int,4> audio_groups{ID_AUDIO_AMBIENCE,ID_AUDIO_EFFECTS,ID_AUDIO_MUSIC,ID_AUDIO_VOICES};
+void show_audio(HWND dialog,const AudioLevels& value) {
+    CheckDlgButton(dialog,ID_AUDIO_MUTE,value.muted?BST_CHECKED:BST_UNCHECKED);
+    SetDlgItemInt(dialog,ID_AUDIO_MASTER,value.volume,FALSE);
+    for(std::size_t i=0;i<audio_groups.size();++i)SetDlgItemInt(dialog,audio_groups[i],value.groups[i],FALSE);
+}
+bool save_audio(Player& p,const AudioLevels& levels,HWND owner) {
+    const auto result=p.audio_profile.apply(levels);
+    if(result==SettingsResult::invalid || result==SettingsResult::write_failed){
+        message(owner,L"No se pudieron guardar los niveles de audio del perfil.");
+        return false;
+    }
+    if(p.online)p.online->audio.set_levels(p.audio_profile.settings());
+    room_menus(p);
+    if(result==SettingsResult::session_only)message(owner,L"Niveles aplicados para esta sesión. No hay carpeta de perfil disponible.");
+    return true;
+}
+INT_PTR CALLBACK audio_dialog(HWND dialog,UINT event,WPARAM w,LPARAM l) {
+    if(event==WM_INITDIALOG){
+        SetWindowLongPtrW(dialog,DWLP_USER,l);
+        SendDlgItemMessageW(dialog,ID_AUDIO_MASTER,EM_SETLIMITTEXT,3,0);
+        for(const auto id:audio_groups)SendDlgItemMessageW(dialog,id,EM_SETLIMITTEXT,3,0);
+        show_audio(dialog,reinterpret_cast<Player*>(l)->audio_profile.settings());
+        return TRUE;
+    }
+    if(event!=WM_COMMAND)return FALSE;
+    switch(LOWORD(w)){
+    case IDCANCEL: EndDialog(dialog,IDCANCEL);return TRUE;
+    case ID_DEFAULTS: show_audio(dialog,AudioLevels{});return TRUE;
+    case IDOK: {
+        auto* player=reinterpret_cast<Player*>(GetWindowLongPtrW(dialog,DWLP_USER));
+        AudioLevels next;
+        auto read=[&](int id,unsigned& value){
+            wchar_t text[4]{};
+            const auto length=GetDlgItemTextW(dialog,id,text,4);
+            if(length && std::all_of(text,text+length,[](wchar_t c){return c>=L'0' && c<=L'9';})){
+                BOOL valid=FALSE;
+                value=GetDlgItemInt(dialog,id,&valid,FALSE);
+                if(valid && value<=100)return true;
+            }
+            message(dialog,L"Escribe un porcentaje entero del 0 al 100.");
+            SetFocus(GetDlgItem(dialog,id));
+            return false;
+        };
+        if(!read(ID_AUDIO_MASTER,next.volume))return TRUE;
+        for(std::size_t i=0;i<audio_groups.size();++i)if(!read(audio_groups[i],next.groups[i]))return TRUE;
+        next.muted=IsDlgButtonChecked(dialog,ID_AUDIO_MUTE)==BST_CHECKED;
+        if(player && save_audio(*player,next,dialog))EndDialog(dialog,IDOK);
+        return TRUE;
+    }}
+    return FALSE;
+}
 void fullscreen(Player& player) {
     HWND window = player.window;
     if (!player.fullscreen) {
@@ -317,6 +372,16 @@ void command(Player& p, unsigned id) {
             CheckMenuItem(p.menu,id,MF_BYCOMMAND|(p.owner_realism?MF_CHECKED:MF_UNCHECKED));
             break;
 #endif
+        case ID_AUDIO_MENU:
+            neutral_controls(p);
+            DialogBoxParamW(p.instance,MAKEINTRESOURCEW(IDD_AUDIO),p.window,audio_dialog,reinterpret_cast<LPARAM>(&p));
+            break;
+        case ID_AUDIO_TOGGLE: {
+            auto next=p.audio_profile.settings();
+            next.muted=!next.muted;
+            save_audio(p,next,p.window);
+            break;
+        }
         case ID_VIDEO_MENU:
             neutral_controls(p);
             if (p.surface) DialogBoxParamW(p.instance, MAKEINTRESOURCEW(IDD_VIDEO), p.window, video_dialog,
@@ -329,7 +394,7 @@ void command(Player& p, unsigned id) {
             break;
         case ID_HELP_KEYS:
             neutral_controls(p);
-            message(p.window,L"F6 abre una invitación. Mayús+F6 sale de la sala. Esc abre los ajustes. F11 cambia la pantalla completa.\n"
+            message(p.window,L"F6 abre una invitación. Mayús+F6 sale de la sala. Esc abre los ajustes. F8 abre audio, F9 silencia o restablece el sonido y F11 cambia la pantalla completa.\n"
                 L"WASD o flechas para caminar, Mayús para correr y Espacio para saltar. Arrastra para mirar y pulsa F3 para cambiar de cámara.\n"
                 L"En un turismo compartido, E conduce o baja y G pide el asiento alternativo. WASD conduce y Espacio frena.");
             break;
@@ -357,6 +422,7 @@ LRESULT CALLBACK player_window(HWND window, UINT event, WPARAM w, LPARAM l) {
                 command(*p,(GetKeyState(VK_SHIFT)&0x8000)?ID_ROOM_LEAVE:ID_ROOM_JOIN);
                 return 0;
             }
+            if(w==VK_F8 || w==VK_F9){command(*p,w==VK_F8?ID_AUDIO_MENU:ID_AUDIO_TOGGLE);return 0;}
             if(w==VK_F7){command(*p,ID_ROOM_MEETING);return 0;}
             if(w==VK_SPACE && p->online){
                 if(p->online->phase==room::Phase::playing && p->online->scene.ready() && !p->online->actors.aboard())

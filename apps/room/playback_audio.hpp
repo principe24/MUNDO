@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mundo/audio.hpp"
+#include "mundo/audio_settings.hpp"
 #include <algorithm>
 #include <chrono>
 #include <memory>
@@ -23,6 +24,13 @@ class PlaybackAudio {
 public:
     ~PlaybackAudio() { suspend(); }
     bool has_sources() const noexcept { return enabled_; }
+
+    void set_levels(const AudioLevels& levels) {
+        std::lock_guard guard(mutex_);
+        mixer_.set_volume(levels.muted ? 0.0 : static_cast<double>(levels.volume) / 100.0);
+        for (std::size_t i=0;i<levels.groups.size();++i)
+            mixer_.set_group_volume(static_cast<audio::Group>(i),static_cast<double>(levels.groups[i]) / 100.0);
+    }
 
     void install(const World& world, bool new_session) {
         const auto scene = audio::read_scene(world);

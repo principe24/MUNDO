@@ -83,6 +83,31 @@ int main() {
             session.frame({}, 0);
         }
         check(!connected && opens == closes + 1, "destruction left an output or callback alive");
+        const std::array<std::string,4> names{"ambiente","efectos","musica","voces"};
+        for(std::size_t index=0;index<names.size();++index){
+            World channels;
+            check(channels.create("MUNDO/Audio/v2/maquina/600/1000/2d/100/loop/"+names[index]+"/Prueba")!=0,"bus marker");
+            room::PlaybackAudio playback;
+            AudioLevels levels;
+            levels.volume=100;
+            levels.groups.fill(0);
+            playback.set_levels(levels);
+            playback.install(channels,true);playback.frame({},0);
+            check(power()==0,"bus mute before scene installation");
+            levels.groups[index]=100;
+            playback.set_levels(levels);
+            const double full=power();
+            check(full>.001,"selected bus audible");
+            levels.volume=20;
+            playback.set_levels(levels);
+            const double quiet=power();
+            check(quiet>0 && quiet<full*.15,"master changes actual PCM energy");
+            levels.muted=true;playback.set_levels(levels);
+            playback.install(channels,true);playback.frame({},0);
+            check(power()==0,"mute survives world replacement");
+            levels.muted=false;playback.set_levels(levels);
+            check(power()>0,"unmute restores requested group");
+        }
         std::cout << "Audio room lifecycle passed with a simulated device.\n";
     } catch(const std::exception& e) {
         std::cerr << e.what() << "\n";

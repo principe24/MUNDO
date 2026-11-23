@@ -50,8 +50,8 @@ async function uploadedSource(req) {
   if (req.headers["content-type"] !== "application/octet-stream") reject(415, "Envía un archivo de Studio.");
   let filename;
   try { filename = decodeURIComponent(req.headers["x-mundo-file"] || ""); } catch {}
-  if (!filename || filename.length > 255 || /[\\/\x00-\x1f\x7f]/u.test(filename) || !/\.(mroom3d|mroom|mworld|mproject)$/i.test(filename))
-    reject(400, "Selecciona un proyecto .mproject, una sala .mroom o .mroom3d, o un .mworld.");
+  if (!filename || filename.length > 255 || /[\\/\x00-\x1f\x7f]/u.test(filename) || !/\.(mroomaudio|mroom3d|mroom|mworld|mproject)$/i.test(filename))
+    reject(400, "Selecciona un proyecto .mproject, una sala .mroom, .mroomaudio o .mroom3d, o un .mworld.");
   const limit = byteLimit(filename);
   if (Number(req.headers["content-length"]) > limit) reject(413, "El archivo supera el tamaño admitido.");
   const parts = [];
@@ -99,7 +99,7 @@ function createPanel(initialFile) {
   let initialMessage = "";
   const initial=initialFile?(async()=>{
     try {
-      if (!/\.(mroom3d|mroom|mworld|mproject)$/i.test(initialFile)) throw Error("Selecciona un proyecto .mproject, una sala .mroom o .mroom3d, o un .mworld.");
+      if (!/\.(mroomaudio|mroom3d|mroom|mworld|mproject)$/i.test(initialFile)) throw Error("Selecciona un proyecto .mproject, una sala .mroom, .mroomaudio o .mroom3d, o un .mworld.");
       pending = await prepareSource(path.basename(initialFile), openRoomSource(initialFile));
       pending.preparation=++preparationNumber;
     } catch {

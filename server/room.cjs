@@ -17,7 +17,7 @@ const {ordinary,ProjectTravel,readProject,sceneCheckpoint,restoreSceneCheckpoint
 const root=path.resolve(__dirname,"..");
 const files=["mundo/MUNDO.html","mundo/player.js","mundo/entrada.js","mundo/residence.js","mundo/sectors.js","mundo/room.js","mundo/walk.js","mundo/drive.js","mundo/avatar.js",
   "web/world.js","web/geometry.js","web/meeting.js","web/room-file.js","web/circuit.js","web/component-record.js","web/project.js","web/interface.css","web/view.js","web/starting-content.js","web/zones.js",
-  "web/people-rig.js","mundo/online-people.js","web/bruma-look.js","web/creator-mesh.js","mundo/room-models.js"];
+  "web/people-rig.js","mundo/online-people.js","web/bruma-look.js","web/creator-mesh.js","mundo/room-models.js","web/audio-scene.js","web/audio-clips.js","web/audio-dsp.js","web/audio-output.js","mundo/scene-audio.js"];
 const movement=["KeyW","KeyS","KeyA","KeyD","ShiftLeft"];
 const invitationLifetimeMs=30*60*1000;
 function fail(status,message){throw Object.assign(new Error(message),{status});}
@@ -505,7 +505,9 @@ async function roomFromSource(source){
     await record.load();
     single.course.record=record;
   }
-  return makeSession(single,null,new SessionCheckpoint(key));
+  const session=makeSession(single,null,new SessionCheckpoint(key));
+  session.audioClips=source.audioClips;
+  return session;
 }
 function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=null,shareInes=false,shareBruma=false,creatorModels=null}={}){
   if(host!=="127.0.0.1" && !tls)throw Error("La red privada requiere HTTPS.");
@@ -514,6 +516,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
   const actorPackage=shareInes===true?require("./room-actor.cjs").inesPackage():null;
   const brumaPackage=shareBruma===true?require("./bruma-package.cjs").readBruma():null;
   const modelRevision=creatorModels?.size && !room.project ? room.revision : null;
+  const audioRevision=room.audioClips?.size && !room.project ? room.revision : null;
   const entries=new EntryDelivery(room);
   const sectors=new SectorDelivery(room,entries.zones);
   const assets=new Map(files.map(file=>{
@@ -573,7 +576,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
       if(req.method==="GET"&&assets.has(url)){
         const ext=path.extname(url);return send(200,assets.get(url),{".html":"text/html; charset=utf-8",".js":"text/javascript",".css":"text/css"}[ext]);
       }
-      if(req.method!=="POST"||!["/room/join","/room/actor","/room/bruma","/room/model","/room/world","/room/world-part","/room/world-rest","/room/entry-info","/room/entry-part","/room/cell-index",
+      if(req.method!=="POST"||!["/room/join","/room/actor","/room/bruma","/room/audio","/room/audio-info","/room/model","/room/world","/room/world-part","/room/world-rest","/room/entry-info","/room/entry-part","/room/cell-index",
         "/room/sector-plan","/room/sector-part","/room/sector-ready","/room/sector-full",
         "/room/sector-ahead","/room/sector-ahead-part","/room/sector-usage","/room/sector-usage-stages",
         "/room/input","/room/meeting","/room/route","/room/leave"].includes(url))fail(404,"Ruta inválida.");
@@ -602,6 +605,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
       if(url==="/room/leave"){room.leave(live);return send(200,"{}");}
       if(url==="/room/join"){
         if(req.headers["x-mundo-scene"]==="loading")p.scene="loading";
+        if(audioRevision)res.setHeader("x-mundo-audio-clips","wav-1");
         if(actorPackage)res.setHeader("x-mundo-actor","ines-bajamar-1");
         if(modelRevision)res.setHeader("x-mundo-creator-models","mesh-1");
         if(brumaPackage)res.setHeader("x-mundo-car-art","bruma-1");
@@ -622,6 +626,30 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
         res.once("close",()=>{meter.actorSending=false;});
         res.setHeader("content-length",actorPackage.length);
         return send(200,actorPackage,"application/octet-stream");
+      }
+      if(url==="/room/audio-info" || url==="/room/audio"){
+        if(!audioRevision)return send(url==="/room/audio-info"?204:404,"");
+        if(!data || typeof data!=="object" || Array.isArray(data))fail(400,"Solicitud de sonido inválida.");
+        if(data.revision!==audioRevision || room.revision!==audioRevision)fail(409,"La revisión de audio cambió.");
+        if(url==="/room/audio-info"){
+          if(Object.keys(data).length!==1)fail(400,"Solicitud de catálogo inválida.");
+          const hashes=[...room.audioClips.values()].map(item=>item.digest);
+          return send(200,[p.lease,...hashes].join("\n")+"\n","text/plain");
+        }
+        if(Object.keys(data).length!==3 || data.lease!==p.lease)fail(403,"La reserva de la plaza cambió.");
+        if(typeof data.key!=="string" || !/^s[0-9a-f]{16}$/.test(data.key))fail(400,"Clave de sonido inválida.");
+        const item=room.audioClips.get(data.key);
+        if(!item)fail(404,"Esta grabación no pertenece a la sala.");
+        const now=performance.now(),burst=8*1024*1024;
+        meter.audioBytes=Math.min(burst,(meter.audioBytes??burst)+(now-(meter.audioAt??now))*1024);
+        meter.audioAt=now;
+        if(meter.audioBytes<item.bytes.length){
+          res.setHeader("Retry-After","1");fail(429,"Espera antes de repetir esta descarga.");
+        }
+        meter.audioBytes-=item.bytes.length;
+        res.setHeader("x-mundo-audio-digest",item.digest);
+        res.setHeader("content-length",item.bytes.length);
+        return send(200,item.bytes,"audio/wav");
       }
       if(url==="/room/model"){
         if(!modelRevision)fail(404,"Este anfitrión no comparte modelos de autor.");

@@ -24,6 +24,7 @@ async function readProject(data){
 }
 function stage(def,savedCourse=null){
   const world=api.MundoWorld.decode(new Uint8Array(def.bytes));
+  require("../web/audio-scene.js").read(world);
   const geometry=api.MundoGeometry.flatten(world);
   const {gates,startMode}=def.gates && def.startMode?def:api.MundoCircuit.read(world);
   const seats=[{id:0,player:null},{id:1,player:null}];

@@ -5,6 +5,9 @@ const { createHash } = require("node:crypto");
 const roomFile = require("../web/room-file.js");
 const modelRoom = require("../web/model-room.js");
 
+const audioRoom = require("../web/audio-clips.js");
+const audioScene = require("../web/audio-scene.js");
+
 function openRoomSource(filename) {
   const limit = byteLimit(filename);
   const fd = fs.openSync(filename, "r");
@@ -25,11 +28,24 @@ function openRoomSource(filename) {
 
 function byteLimit(filename) {
   const ext=path.extname(filename).toLowerCase();
-  return ext===".mroom3d" ? modelRoom.maxBytes : ext===".mproject" ? 64*1024*1024 : ext===".mroom" ? roomFile.maxBytes : 24*1024*1024;
+  return ext===".mroomaudio" ? audioRoom.maxRoomBytes : ext===".mroom3d" ? modelRoom.maxBytes : ext===".mproject" ? 64*1024*1024 : ext===".mroom" ? roomFile.maxBytes : 24*1024*1024;
 }
 
 function readRoomSource(filename, data) {
   if (data.length < 24 || data.length > byteLimit(filename)) throw Error("Tamaño de archivo incompatible.");
+  if (path.extname(filename).toLowerCase() === ".mroomaudio") {
+    const {room,items}=audioRoom.unpack(data);
+    const source=readRoomSource("revision.mroom",room);
+    const {MundoWorld}=require("./room-runtime.cjs");
+    audioRoom.match(audioScene.read(MundoWorld.decode(source.bytes)),items);
+    const audioClips=new Map();
+    for(const item of items){
+      if(createHash("sha256").update(item.bytes).digest("hex")!==item.digest)
+        throw Error("La grabación no coincide con su huella.");
+      audioClips.set(item.key,item);
+    }
+    return {...source,audioClips};
+  }
   if (path.extname(filename).toLowerCase() === ".mroom3d") {
     const {room,items}=modelRoom.unpack(data);
     const source=readRoomSource("revision.mroom",room);

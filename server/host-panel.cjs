@@ -27,6 +27,8 @@ const studioFiles = [
   "web/creator-mesh.js", "web/model-room.js", "web/obj-import.js", "studio/creator-assets.js", "web/creator-surface-materials.js", "studio/creator-material-panel.js", "studio/creator-model-panel.js",
   "studio/studio.css", "studio/vehicle-model.js", "studio/patio-template.js", "web/world.js", "web/starting-content.js", "web/geometry.js",
   "web/zones.js", "web/view.js", "web/meeting.js", "web/room-file.js", "web/circuit.js","web/component-record.js","web/plugin-registry.js","web/project.js","web/experience-look.js","web/bruma-look.js",
+  "web/audio-scene.js","web/audio-clips.js","web/audio-library.js","web/audio-dsp.js","web/audio-output.js","studio/audio-panel.js",
+  "web/npc-routes.js","web/navigation-3d.js","studio/npc-preflight.js","studio/npc-panel.js",
   "web/interface.css", "web/ahead-report.js", "web/course-timing.js", "mundo/drive.js", "mundo/walk.js"
 ];
 for (const file of studioFiles) {
@@ -110,7 +112,7 @@ function createPanel(initialFile) {
     const {room, filename, publication, selected} = source;
     const state = room.moderation.status(view);
     const vehicle = state.vehicle;
-    return {filename, preparation:source.preparation, modelCount:source.models?.size??0, modelNames:source.models ? Array.from(source.models.values(),m=>m.name) : [], title: room.name, characterLook:room.characterLook, usesBruma:room.usesBruma, publication:room.project?room.source.publication:publication,
+    return {filename, preparation:source.preparation, audioClipCount:source.room.audioClips?.size??0, modelCount:source.models?.size??0, modelNames:source.models ? Array.from(source.models.values(),m=>m.name) : [], title: room.name, characterLook:room.characterLook, usesBruma:room.usesBruma, publication:room.project?room.source.publication:publication,
       hash: room.revision, selected:room.project?room.source.vehicleRoot!==null:selected, project:state.project,
       course:state.course, checkpoint:active?.source === source ? state.checkpoint : null,
       ...(view==="preview"?{}:{track:state.track}),

@@ -193,6 +193,8 @@ function display(next) {
     el("phase").textContent = state.room ? "Sala abierta" : "Revisión preparada";
     el("title").textContent = info.title;
     el("filename").textContent = info.filename;
+    el("audioLabel").hidden=el("audioCount").hidden=!info.audioClipCount;
+    if(info.audioClipCount)el("audioCount").textContent=String(info.audioClipCount);
     const course=info.course, summary=el("courseInfo"), replay=el("restartCourse");
     summary.hidden=!course;replay.hidden=!state.room || !course;
     replay.disabled=working || !course?.canRestart || Boolean(info.project?.destination);

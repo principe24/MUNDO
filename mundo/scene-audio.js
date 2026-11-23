@@ -17,6 +17,7 @@ globalThis.MundoPlayerAudio = (() => {
       if (valid(stored)) settings = stored;
     } catch {}
     let output = null, sources = [], position = [0, 0, 0], yaw = 0, active = false;
+    let music = null;
     let unlocked = false, attempt = null;
     const clips = new Map();
 
@@ -26,7 +27,7 @@ globalThis.MundoPlayerAudio = (() => {
       for (const group of groups) output.setGroupVolume(group, settings[group] / 100);
     }
     function activate(force = false) {
-      if (!force && (!active || !sources.length || settings.muted || !settings.volume))
+      if (!force && (!active || (!sources.length && !music) || settings.muted || !settings.volume))
         return Promise.resolve(false);
       if (attempt) return attempt;
       if (unlocked && output?.running) return Promise.resolve(true);
@@ -35,6 +36,12 @@ globalThis.MundoPlayerAudio = (() => {
         output.setPaused(!active);
         for (const [key, pcm] of clips) output.setClip(key, pcm);
         output.setSources(sources);
+        if (music) {
+          const first=music.segments[0]?.index ?? music.firstIndex;
+          output.beginMusicStream(music.id,first);
+          for (const segment of music.segments)
+            output.queueMusicSegment(music.id,segment.index,segment.key,segment.pcm,segment.final);
+        }
         output.setListener(position, yaw);
         applyVolume();
       }
@@ -55,6 +62,27 @@ globalThis.MundoPlayerAudio = (() => {
       get clipKeys() { return [...new Set(sources.map(s => s.preset).filter(id => /^s[0-9a-f]{16}$/.test(id)))]; },
       setClip(key, pcm) { clips.set(key, pcm); output?.setClip(key, pcm); },
       clearClips() { clips.clear(); output?.clearClips(); },
+      beginMusicStream(id,firstIndex=0) {
+        const key=String(id);
+        if (!/^[1-9][0-9]{0,19}$/.test(key) || !Number.isInteger(firstIndex) || firstIndex<0 || firstIndex>0xffffffff)
+          return false;
+        if (music) output?.cancelMusicStream(music.id);
+        music={id:key,firstIndex,expected:firstIndex,segments:[]};
+        return output ? output.beginMusicStream(key,firstIndex) : true;
+      },
+      queueMusicSegment(id,index,key,pcm,final=false) {
+        if (!music || String(id)!==music.id || index!==music.expected || typeof final!=="boolean") return false;
+        const accepted=output ? output.queueMusicSegment(music.id,index,key,pcm,final) : music.segments.length<2;
+        if (!accepted) return false;
+        music.segments.push({index,key,pcm,final});
+        if (music.segments.length>2) music.segments.shift();
+        music.expected++;
+        return true;
+      },
+      cancelMusicStream(id) {
+        if (!music || String(id)!==music.id) return false;
+        output?.cancelMusicStream(music.id);music=null;return true;
+      },
       apply(prefs) {
         if (!valid(prefs)) throw Error("El volumen debe estar entre 0 y 100.");
         settings = Object.fromEntries(Object.keys(defaults).map(key => [key, prefs[key]]));
@@ -66,7 +94,10 @@ globalThis.MundoPlayerAudio = (() => {
         const next = host.MundoAudioScene.read(world);
         // IDs are local to a world. A one-shot or voice with ID 1 in a new
         // publication must not inherit the previous world's playback cursor.
-        if (!sameRevision) output?.setSources([]);
+        if (!sameRevision) {
+          output?.setSources([]);
+          if (music) {output?.cancelMusicStream(music.id);music=null;}
+        }
         sources = next;
         output?.setSources(next);
       },
@@ -79,7 +110,7 @@ globalThis.MundoPlayerAudio = (() => {
         output?.setPaused(!active);
       },
       clear() {
-        active = false; sources = []; clips.clear(); unlocked = false; attempt = null;
+        active = false; sources = []; music=null; clips.clear(); unlocked = false; attempt = null;
         output?.close();
         output = null;
       }

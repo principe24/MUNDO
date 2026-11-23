@@ -201,6 +201,37 @@ void clip_formats() {
     check(energy(pcm,0)==0,"reset releases clips");
 }
 
+void segmented_music() {
+    const auto wav=[](std::int16_t a,std::int16_t b){
+        std::vector<std::uint8_t> bytes{'R','I','F','F',40,0,0,0,'W','A','V','E','f','m','t',' ',
+            16,0,0,0,1,0,1,0,0xc0,0x5d,0,0,0x80,0xbb,0,0,2,0,16,0,'d','a','t','a',4,0,0,0};
+        bytes.push_back(static_cast<std::uint8_t>(a));bytes.push_back(static_cast<std::uint8_t>(a>>8));
+        bytes.push_back(static_cast<std::uint8_t>(b));bytes.push_back(static_cast<std::uint8_t>(b>>8));
+        return bytes;
+    };
+    const auto decode=[](const auto& bytes){
+        const auto key="s"+document_digest(std::as_bytes(std::span(bytes))).substr(0,16);
+        return decode_clip(key,bytes);
+    };
+    auto positive=decode(wav(32767,32767)),negative=decode(wav(-32768,-32768)),tail=decode(wav(16384,16384));
+    check(positive&&negative&&tail,"stream fixtures");
+    Mixer mixer(24000);
+    check(!mixer.begin_music_stream(0,4)&&mixer.begin_music_stream(91,4),"stream identity");
+    check(mixer.queue_music_segment(91,4,positive,false)&&mixer.queue_music_segment(91,5,negative,false),"initial stream window");
+    check(mixer.buffered_music_segments()==2&&!mixer.queue_music_segment(91,6,tail,true),"stream memory window");
+    std::vector<float> first(8);mixer.render(first);
+    check(first[0]>0&&first[2]>0&&first[4]<0&&first[6]<0,"gapless segment boundary");
+    check(mixer.buffered_music_segments()==1&&mixer.queue_music_segment(91,6,tail,true),"refill stream window");
+    check(!mixer.queue_music_segment(91,7,tail,false),"sealed stream accepted trailing data");
+    std::vector<float> last(8);mixer.render(last);
+    check(last[0]>0&&last[2]>0&&last[4]==0&&!mixer.has_music_stream()&&mixer.buffered_music_segments()==0,
+          "final stream segment");
+    check(mixer.begin_music_stream(92)&&mixer.queue_music_segment(92,0,positive,false),"restart stream");
+    check(!mixer.cancel_music_stream(91)&&mixer.cancel_music_stream(92)&&!mixer.has_music_stream(),"stale cancellation");
+    check(mixer.begin_music_stream(93),"stream before reset");mixer.reset();
+    check(!mixer.has_music_stream(),"world reset retained long music");
+}
+
 int transfer(int argc,char** argv) {
     const char* input=argv[1], *output=argv[2];
     std::ifstream in(input,std::ios::binary);
@@ -255,7 +286,7 @@ int main(int argc,char** argv) {
     try{
         if(argc==3 || argc==4 || argc==6 || argc==7)return transfer(argc,argv);
         check(argc==1,"usage: audio_mixer [world.mworld stereo.f32]");
-        format();signals();source_pause();gain_automation();extended_signals();clip_formats();
+        format();signals();source_pause();gain_automation();extended_signals();clip_formats();segmented_music();
         std::cout<<"Native audio scene, continuity, spatial PCM, silence, and limiter passed\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

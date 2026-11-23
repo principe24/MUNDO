@@ -226,3 +226,32 @@ test("la salida recuerda la pausa individual antes del gesto, hasta el siguiente
   assert.deepEqual(next.buffer.getChannelData(0),expected);
   output.close();assert.equal(output.setSourcePaused(a.id,false),false);
 });
+
+test("la salida inicia música segmentada antes del gesto y la cancela al cambiar de mundo",async()=>{
+  const {host,contexts,ticks}=device(),output=Output.create(host),key="s0011223344556677";
+  const pcm={sampleRate:24000,samples:new Float32Array(2000).fill(.4)};
+  assert.equal(output.beginMusicStream("0"),false);
+  assert.equal(output.beginMusicStream("700",10),true);
+  assert.equal(output.queueMusicSegment("700",10,key,pcm,false),true);
+  assert.equal(output.queueMusicSegment("700",11,key,pcm,false),true);
+  assert.equal(output.queueMusicSegment("700",12,key,pcm,true),false);
+  assert.equal(await output.unlock(),true);
+  assert.ok(energy(contexts[0])>1);assert.equal(ticks.size,1);
+  assert.equal(output.cancelMusicStream("701"),false);
+  assert.equal(output.cancelMusicStream("700"),true);
+  assert.ok(contexts[0].nodes.every(node=>node.stopped));assert.equal(ticks.size,0);
+  output.close();
+});
+
+test("el reproductor admite una pista sin emisores y la descarta con la revisión",async()=>{
+  const {host,contexts,ticks}=device(),player=Player.create(host,false),key="s8899aabbccddeeff";
+  const pcm={sampleRate:24000,samples:new Float32Array(4000).fill(.3)};
+  assert.equal(player.beginMusicStream("800",2),true);
+  assert.equal(player.queueMusicSegment("800",2,key,pcm,false),true);
+  player.setActive(true);assert.equal(await player.activate(),true);
+  assert.ok(energy(contexts[0])>1);assert.equal(ticks.size,1);
+  player.install({nodes:new Map()},false);
+  assert.ok(contexts[0].nodes.every(node=>node.stopped));assert.equal(ticks.size,0);
+  assert.equal(player.queueMusicSegment("800",3,key,pcm,true),false);
+  player.clear();
+});

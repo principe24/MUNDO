@@ -332,6 +332,44 @@ void Mixer::clear_clips() noexcept {
     clips_ = {};
 }
 
+bool Mixer::begin_music_stream(std::uint64_t stream_id, std::uint32_t first_segment) noexcept {
+    if (!stream_id) return false;
+    music_ = {};
+    music_.id = stream_id;
+    music_.expected = first_segment;
+    music_.active = true;
+    return true;
+}
+
+bool Mixer::queue_music_segment(std::uint64_t stream_id, std::uint32_t index, Clip segment, bool final) noexcept {
+    if (!segment || !music_.active || music_.finished || music_.sealed || stream_id != music_.id ||
+        index != music_.expected) return false;
+    if (!music_.current) {
+        music_.current = std::move(segment);
+        music_.current_final = final;
+    } else if (!music_.next) {
+        music_.next = std::move(segment);
+        music_.next_final = final;
+    } else return false;
+    ++music_.expected;
+    music_.sealed = final;
+    return true;
+}
+
+bool Mixer::cancel_music_stream(std::uint64_t stream_id) noexcept {
+    if (!music_.active || music_.id != stream_id) return false;
+    music_ = {};
+    return true;
+}
+
+bool Mixer::has_music_stream() const noexcept {
+    return music_.active && !music_.finished;
+}
+
+std::size_t Mixer::buffered_music_segments() const noexcept {
+    return static_cast<std::size_t>(bool(music_.current)) + static_cast<std::size_t>(bool(music_.next));
+}
+
 bool Mixer::trigger(EntityId id) noexcept {
     for (std::size_t i = 0; i < count_; ++i) {
         auto& v = voices_[i];
@@ -357,7 +395,47 @@ bool Mixer::set_source_paused(EntityId id, bool paused) noexcept {
 void Mixer::reset() noexcept {
     voices_ = {}; count_ = 0;
     clear_clips();
+    music_ = {};
     listener_ = {}; yaw_ = 0;
+}
+
+double Mixer::music_sample() noexcept {
+    if (!music_.active || music_.finished || !music_.current) return 0;
+    if (music_.cursor >= music_.current->samples_.size()) {
+        if (music_.next) {
+            music_.current = std::move(music_.next);
+            music_.current_final = music_.next_final;
+            music_.next_final = false;
+            music_.cursor = 0;
+        } else if (music_.current_final) {
+            music_.current.reset();
+            music_.finished = true;
+            music_.cursor = 0;
+            return 0;
+        } else return 0;
+    }
+    const auto& data = music_.current->samples_;
+    const auto i = static_cast<std::size_t>(music_.cursor);
+    const double first = data[i];
+    const double next = i + 1 < data.size() ? data[i + 1] : first;
+    const auto result = first + (next - first) * (music_.cursor - i);
+    music_.cursor += 24000. / rate_;
+    if (music_.cursor < data.size()) return result;
+
+    music_.cursor -= data.size();
+    if (music_.next) {
+        music_.current = std::move(music_.next);
+        music_.current_final = music_.next_final;
+        music_.next_final = false;
+        if (music_.cursor >= music_.current->samples_.size()) music_.cursor = 0;
+    } else if (music_.current_final) {
+        music_.current.reset();
+        music_.finished = true;
+        music_.cursor = 0;
+    } else {
+        music_.cursor = data.size();
+    }
+    return result;
 }
 
 double Mixer::sample(Voice& v) const noexcept {
@@ -428,6 +506,15 @@ void Mixer::render(std::span<float> output) noexcept {
             }
             output[j] += value * v.left;
             output[j+1] += value * v.right;
+        }
+    }
+    if (has_music_stream()) {
+        const auto& group = groups_[static_cast<unsigned>(Group::musica)];
+        constexpr double center = .7071067811865475244;
+        for (std::size_t j = 0; j < samples; j += 2) {
+            const auto value = music_sample() * group.at(j / 2) * center;
+            output[j] += value;
+            output[j + 1] += value;
         }
     }
     for (std::size_t i = 0; i < samples; ++i) {

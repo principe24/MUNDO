@@ -75,7 +75,7 @@ globalThis.MundoAudioDSP = (() => {
   }
   function create(rate) {
     if (!Number.isInteger(rate) || rate < 8000 || rate > 192000) throw Error("Frecuencia de audio inválida.");
-    let voices = [], listener = [0,0,0], yaw = 0, paused = false;
+    let voices = [], listener = [0,0,0], yaw = 0, paused = false, music = null;
     const rampSamples = Math.max(1, Math.round(.01 * rate));
     const gain=()=>({value:1,target:1,step:0,remaining:0});
     const master=gain(), clips = new Map(), groupLevels = {ambiente:gain(),efectos:gain(),musica:gain(),voces:gain()};
@@ -179,18 +179,77 @@ globalThis.MundoAudioDSP = (() => {
         throw Error("Volumen de grupo inválido.");
       gainFade(groupLevels[group],value,milliseconds);
     }
-    function setClip(key, clip) {
+    function copyClip(key, clip) {
       if (typeof key !== "string" || !clipKey.test(key) || clip?.sampleRate !== 24000 ||
           Object.prototype.toString.call(clip.samples) !== "[object Float32Array]" ||
-          clip.samples.length < 1 || clip.samples.length > 384000 || (!clips.has(key) && clips.size >= 16))
-        throw Error("Clip de audio fuera de los límites de la sala.");
+          clip.samples.length < 1 || clip.samples.length > 384000)
+        throw Error("Segmento de audio fuera de los límites de la sala.");
       const data = new Float32Array(clip.samples);
       if (!data.every(v => Number.isFinite(v) && Math.abs(v) <= 1)) throw Error("Muestras de audio inválidas.");
+      return data;
+    }
+    function setClip(key, clip) {
+      if (!clips.has(key) && clips.size >= 16) throw Error("Clip de audio fuera de los límites de la sala.");
+      const data = copyClip(key,clip);
       for (const voice of voices) if (voice.source.preset === key) {
         voice.clip = data;
         if (voice.cursor >= data.length && !voice.done) voice.cursor %= data.length;
       }
       clips.set(key,data);
+    }
+    function streamId(value) {
+      const id=String(value);
+      if (!/^[1-9][0-9]{0,19}$/.test(id) || BigInt(id)>18446744073709551615n)
+        throw Error("Identificador de música inválido.");
+      return id;
+    }
+    function beginMusicStream(id,firstIndex=0) {
+      if (!Number.isInteger(firstIndex) || firstIndex<0 || firstIndex>0xffffffff)
+        throw Error("Índice inicial de música inválido.");
+      music={id:streamId(id),expected:firstIndex,current:null,next:null,cursor:0,
+        currentFinal:false,nextFinal:false,sealed:false,finished:false};
+    }
+    function queueMusicSegment(id,index,key,clip,final=false) {
+      if (!music || music.id!==streamId(id) || music.finished || music.sealed ||
+          !Number.isInteger(index) || index!==music.expected || typeof final!=="boolean") return false;
+      const data=copyClip(key,clip);
+      if (!music.current) {music.current=data;music.currentFinal=final;}
+      else if (!music.next) {music.next=data;music.nextFinal=final;}
+      else return false;
+      music.expected++;music.sealed=final;
+      return true;
+    }
+    function cancelMusicStream(id) {
+      if (!music || music.id!==streamId(id)) return false;
+      music=null;
+      return true;
+    }
+    const bufferedMusicSegments=()=>music ? Number(Boolean(music.current))+Number(Boolean(music.next)) : 0;
+    function musicSample() {
+      if (!music || music.finished || !music.current) return 0;
+      if (music.cursor>=music.current.length) {
+        if (music.next) {
+          music.current=music.next;music.currentFinal=music.nextFinal;
+          music.next=null;music.nextFinal=false;music.cursor=0;
+        } else if (music.currentFinal) {
+          music.current=null;music.finished=true;music.cursor=0;return 0;
+        } else return 0;
+      }
+      const data=music.current,i=Math.floor(music.cursor),fraction=music.cursor-i;
+      const next=i+1<data.length?data[i+1]:data[i];
+      const sample=data[i]+(next-data[i])*fraction;
+      music.cursor+=24000/rate;
+      if (music.cursor>=data.length) {
+        music.cursor-=data.length;
+        if (music.next) {
+          music.current=music.next;music.currentFinal=music.nextFinal;
+          music.next=null;music.nextFinal=false;
+          if (music.cursor>=music.current.length) music.cursor=0;
+        } else if (music.currentFinal) {
+          music.current=null;music.finished=true;music.cursor=0;
+        } else music.cursor=data.length;
+      }
+      return sample;
     }
     function clearClips() {
       clips.clear();
@@ -224,7 +283,7 @@ globalThis.MundoAudioDSP = (() => {
            right.byteOffset < left.byteOffset + left.byteLength))
         throw Error("La salida necesita dos canales de muestras separados y de igual longitud.");
       left.fill(0); right.fill(0);
-      if (paused || !voices.length) return;
+      if (paused || (!voices.length && (!music || music.finished))) return;
       for (const voice of voices) {
         const s = voice.source, duration = onceSeconds[s.preset], group = groupLevels[s.group];
         if (voice.paused || (!duration && !voice.clip)) continue;
@@ -245,6 +304,13 @@ globalThis.MundoAudioDSP = (() => {
           right[i] += sample * voice.right;
         }
       }
+      if (music && !music.finished) {
+        const group=groupLevels.musica,center=Math.SQRT1_2;
+        for (let i=0;i<left.length;i++) {
+          const sample=musicSample()*gainAt(group,i)*center;
+          left[i]+=sample;right[i]+=sample;
+        }
+      }
       for (let i = 0; i < left.length; ++i) {
         left[i] = gainAt(master,i) * left[i] / (1 + Math.abs(left[i]));
         right[i] = gainAt(master,i) * right[i] / (1 + Math.abs(right[i]));
@@ -252,9 +318,10 @@ globalThis.MundoAudioDSP = (() => {
       gainAdvance(master,left.length);
       for (const group of groups) gainAdvance(groupLevels[group],left.length);
     }
-    function reset() { voices = []; clips.clear(); listener = [0,0,0]; yaw = 0; }
+    function reset() { voices = []; clips.clear(); music=null; listener = [0,0,0]; yaw = 0; }
     return Object.freeze({setSources, setListener, setVolume, setGroupVolume, fadeVolume, fadeGroupVolume,
-      setPaused, setSourcePaused, setClip, clearClips, trigger, render, reset});
+      setPaused, setSourcePaused, setClip, clearClips, beginMusicStream, queueMusicSegment,
+      cancelMusicStream, bufferedMusicSegments, trigger, render, reset});
   }
   return Object.freeze({create});
 })();

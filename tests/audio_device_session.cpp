@@ -1,8 +1,10 @@
 // Exercises the same scene and PCM callback used by the three platform outputs.
 #include "playback_audio.hpp"
+#include "mundo/document_digest.hpp"
 #include <array>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 using namespace mundo;
 namespace {
@@ -28,6 +30,17 @@ double power() {
         for (auto sample : buffer) sum += sample * sample;
     }
     return sum;
+}
+std::vector<std::uint8_t> music_wav() {
+    constexpr std::uint32_t samples=24000,data=samples*2,total=36+data;
+    std::vector<std::uint8_t> bytes(44+data);
+    const auto text=[&](unsigned at,const char* value,unsigned count){for(unsigned i=0;i<count;++i)bytes[at+i]=value[i];};
+    const auto word=[&](unsigned at,std::uint16_t value){bytes[at]=value;bytes[at+1]=value>>8;};
+    const auto dword=[&](unsigned at,std::uint32_t value){word(at,value);word(at+2,value>>16);};
+    text(0,"RIFF",4);dword(4,total);text(8,"WAVEfmt ",8);dword(16,16);word(20,1);word(22,1);
+    dword(24,24000);dword(28,48000);word(32,2);word(34,16);text(36,"data",4);dword(40,data);
+    for(unsigned i=0;i<samples;++i)word(44+2*i,12000);
+    return bytes;
 }
 }
 namespace mundo::room {
@@ -121,6 +134,19 @@ int main() {
             check(!playback.transition_levels(levels,60001),"unbounded transition accepted");
             levels.groups[0]=101;
             check(!playback.transition_levels(levels,20),"invalid transition levels accepted");
+        }
+        {
+            room::PlaybackAudio playback;
+            const auto wav=music_wav();
+            const auto key="s"+document_digest(std::as_bytes(std::span(wav))).substr(0,16);
+            check(!playback.begin_music_stream(0)&&playback.begin_music_stream(501,3),"start long music");
+            check(playback.install_music_segment(501,3,key,std::as_bytes(std::span(wav)),false),"install music segment");
+            playback.frame({},0);
+            check(connected&&power()>.001,"music-only room did not open output");
+            playback.install(legacy,true);
+            check(!connected&&!playback.has_sources(),"world switch retained streamed music");
+            check(!playback.install_music_segment(501,4,key,std::as_bytes(std::span(wav)),true),"stale segment crossed world switch");
+            check(!playback.cancel_music_stream(501),"stale cancellation accepted");
         }
         std::cout << "Audio room lifecycle passed with a simulated device.\n";
     } catch(const std::exception& e) {

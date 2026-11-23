@@ -122,6 +122,32 @@ test("un bucle de clip interpola hacia el primer fotograma y no altera la fuente
   m.reset();m.setSources([s]);assert.deepEqual(render(m,6)[0],new Float32Array(6));
 });
 
+test("la música larga conserva continuidad con dos segmentos y cancela datos atrasados",()=>{
+  const m=dsp.create(sampleRate),key="s0011223344556677";
+  assert.throws(()=>m.beginMusicStream("0"));
+  m.beginMusicStream("91",4);
+  assert.equal(m.queueMusicSegment("91",4,key,{sampleRate,samples:Float32Array.of(1,1)},false),true);
+  assert.equal(m.queueMusicSegment("91",5,key,{sampleRate,samples:Float32Array.of(-1,-1)},false),true);
+  assert.equal(m.bufferedMusicSegments(),2);
+  assert.equal(m.queueMusicSegment("91",6,key,{sampleRate,samples:Float32Array.of(.5,.5)},true),false);
+  const [first,right]=render(m,4);
+  assert.ok(first[0]>0&&first[1]>0&&first[2]<0&&first[3]<0);
+  assert.deepEqual(first,right);
+  assert.equal(m.bufferedMusicSegments(),1);
+  assert.equal(m.queueMusicSegment("91",6,key,{sampleRate,samples:Float32Array.of(.5,.5)},true),true);
+  assert.equal(m.queueMusicSegment("91",7,key,{sampleRate,samples:Float32Array.of(.5)},false),false);
+  const [last]=render(m,4);
+  assert.ok(last[0]>0&&last[1]>0&&last[2]===0&&last[3]===0);
+  assert.equal(m.bufferedMusicSegments(),0);
+  m.beginMusicStream("92");
+  assert.equal(m.queueMusicSegment("92",0,key,{sampleRate,samples:Float32Array.of(.25)},false),true);
+  assert.equal(m.cancelMusicStream("91"),false);
+  assert.equal(m.cancelMusicStream("92"),true);
+  assert.equal(rms(render(m,8)[0]),0);
+  m.beginMusicStream("93");m.reset();
+  assert.equal(m.bufferedMusicSegments(),0);
+});
+
 test("una fuente one-shot inaudible espera al oyente sin rearmarse al salir del alcance",()=>{
   const s=source({position:[50,0,0],preset:"agua",loop:false,playbackRate:4}),m=setup(s);
   assert.equal(rms(render(m,18000)[0]),0);

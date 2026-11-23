@@ -46,7 +46,7 @@ public:
         if (new_session || !scene) {
             mixer_.reset();
         }
-        enabled_ = scene && mixer_.set_scene(*scene) && mixer_.has_sources();
+        enabled_ = scene && mixer_.set_scene(*scene) && (mixer_.has_sources() || mixer_.has_music_stream());
     }
 
     // Validate and decode outside the mixer's short control-thread critical section.
@@ -57,6 +57,35 @@ public:
         if (!clip) return false;
         std::lock_guard guard(mutex_);
         return mixer_.set_clip(key, std::move(clip));
+    }
+
+    bool begin_music_stream(std::uint64_t stream_id, std::uint32_t first_segment = 0) {
+        suspend();
+        std::lock_guard guard(mutex_);
+        if (!mixer_.begin_music_stream(stream_id, first_segment)) return false;
+        enabled_ = true;
+        return true;
+    }
+
+    // Decoding and digest verification happen before taking the callback lock.
+    bool install_music_segment(std::uint64_t stream_id, std::uint32_t index, std::string_view key,
+                               std::span<const std::byte> data, bool final) {
+        const auto* bytes = reinterpret_cast<const std::uint8_t*>(data.data());
+        auto clip = audio::decode_clip(key, {bytes, data.size()});
+        if (!clip) return false;
+        std::lock_guard guard(mutex_);
+        return mixer_.queue_music_segment(stream_id, index, std::move(clip), final);
+    }
+
+    bool cancel_music_stream(std::uint64_t stream_id) {
+        bool cancelled{};
+        {
+            std::lock_guard guard(mutex_);
+            cancelled = mixer_.cancel_music_stream(stream_id);
+            if (cancelled && !mixer_.has_sources()) enabled_ = false;
+        }
+        if (cancelled) suspend();
+        return cancelled;
     }
 
     // Called on the owning game thread, only after an admitted local player has a pose.

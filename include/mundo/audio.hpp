@@ -71,6 +71,14 @@ public:
     bool fade_group_volume(Group group, double volume, unsigned milliseconds) noexcept;
     bool set_clip(std::string_view key, Clip clip) noexcept;
     void clear_clips() noexcept;
+    // Long music is supplied as content-addressed, canonical PCM segments. The
+    // mixer retains at most the current and next segment, so a stalled sender
+    // cannot grow the real-time working set without bound.
+    bool begin_music_stream(std::uint64_t stream_id, std::uint32_t first_segment = 0) noexcept;
+    bool queue_music_segment(std::uint64_t stream_id, std::uint32_t index, Clip segment, bool final) noexcept;
+    bool cancel_music_stream(std::uint64_t stream_id) noexcept;
+    [[nodiscard]] bool has_music_stream() const noexcept;
+    [[nodiscard]] std::size_t buffered_music_segments() const noexcept;
     bool trigger(EntityId id) noexcept;
     void set_paused(bool paused) noexcept;
     bool set_source_paused(EntityId id, bool paused) noexcept;
@@ -106,7 +114,15 @@ private:
     };
 
     struct ClipEntry { std::uint64_t key{}; Clip data; };
+    struct MusicStream {
+        std::uint64_t id{};
+        std::uint32_t expected{};
+        Clip current, next;
+        double cursor{};
+        bool current_final{}, next_final{}, sealed{}, active{}, finished{};
+    };
     std::array<ClipEntry, max_sources> clips_{};
+    MusicStream music_{};
     std::array<Gain, 4> groups_{};
     unsigned rate_, ramp_samples_;
     std::array<Voice, max_sources> voices_{};
@@ -121,6 +137,7 @@ private:
     Voice new_voice(const Source&) const noexcept;
     const std::vector<float>* find_clip(std::uint64_t) const noexcept;
     double sample(Voice&) const noexcept;
+    double music_sample() noexcept;
 };
 
 } // namespace mundo::audio

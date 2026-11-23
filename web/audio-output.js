@@ -6,6 +6,7 @@ globalThis.MundoAudioOutput = (() => {
   function create(host = globalThis) {
     let context = null, gain = null, mixer = null, pending = null;
     let paused = false, closed = false, volume = 1, sources = [];
+    let music = null;
     let position = [0, 0, 0], yaw = 0, timer = null, nextTime = 0;
     const queued = new Set(), buffers = [], clips = new Map(), groups = new Map();
 
@@ -34,7 +35,7 @@ globalThis.MundoAudioOutput = (() => {
     }
 
     function pump() {
-      if (!context || context.state !== "running" || paused || !sources.length || !volume) {
+      if (!context || context.state !== "running" || paused || (!sources.length && !music) || !volume) {
         if (timer !== null) stopQueue();
         return;
       }
@@ -75,6 +76,12 @@ globalThis.MundoAudioOutput = (() => {
           context = new Constructor();
           mixer = host.MundoAudioDSP.create(context.sampleRate);
           for (const [key, pcm] of clips) mixer.setClip(key, pcm);
+          if (music) {
+            const first=music.segments[0]?.index ?? music.firstIndex;
+            mixer.beginMusicStream(music.id,first);
+            for (const segment of music.segments)
+              mixer.queueMusicSegment(music.id,segment.index,segment.key,segment.pcm,segment.final);
+          }
           for (const [group, level] of groups) mixer.setGroupVolume(group, level);
           mixer.setSources(sources);
           for (const id of pausedSources.keys()) mixer.setSourcePaused(id,true);
@@ -113,6 +120,36 @@ globalThis.MundoAudioOutput = (() => {
         clips.clear();
         mixer?.clearClips();
         stopQueue(); pump();
+      },
+      beginMusicStream(id, firstIndex = 0) {
+        if (closed) return false;
+        const key=String(id);
+        if (!/^[1-9][0-9]{0,19}$/.test(key) || !Number.isInteger(firstIndex) || firstIndex<0 || firstIndex>0xffffffff)
+          return false;
+        stopQueue();
+        mixer?.beginMusicStream(key,firstIndex);
+        music={id:key,firstIndex,expected:firstIndex,segments:[]};
+        pump();
+        return true;
+      },
+      queueMusicSegment(id,index,key,pcm,final=false) {
+        if (closed || !music || String(id)!==music.id || index!==music.expected || typeof final!=="boolean") return false;
+        let accepted;
+        if (mixer) accepted=mixer.queueMusicSegment(music.id,index,key,pcm,final);
+        else accepted=music.segments.length<2;
+        if (!accepted) return false;
+        music.segments.push({index,key,pcm,final});
+        if (music.segments.length>2) music.segments.shift();
+        music.expected++;
+        pump();
+        return true;
+      },
+      cancelMusicStream(id) {
+        if (closed || !music || String(id)!==music.id) return false;
+        mixer?.cancelMusicStream(music.id);
+        music=null;
+        stopQueue();pump();
+        return true;
       },
       setGroupVolume(group, level, milliseconds = 0) {
         if (closed) return;
@@ -175,7 +212,7 @@ globalThis.MundoAudioOutput = (() => {
         if (closed) return;
         closed = true;
         releaseContext();
-        sources = []; clips.clear(); groups.clear(); pausedSources.clear();
+        sources = []; music=null; clips.clear(); groups.clear(); pausedSources.clear();
       }
     };
   }

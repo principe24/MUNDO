@@ -12,7 +12,7 @@
 using namespace mundo;
 namespace {
 using namespace std::chrono_literals;
-enum class Mode { normal, corrupt, legacy };
+enum class Mode { normal, corrupt, legacy, project };
 Mode mode{};
 std::atomic<unsigned> clip_calls{}, info_calls{};
 
@@ -42,11 +42,14 @@ int run() {
     mixer.set_group_volume(audio::Group::efectos, 0);
     bool world = false;
     unsigned after_download = 0;
+    bool first_room_heard = false;
+    std::string heard_key;
     const auto until = std::chrono::steady_clock::now() + 8s;
     while(std::chrono::steady_clock::now() < until) {
         auto update = client.poll();
         if (update.phase == room::Phase::ended) {std::cerr << update.message << '\n'; return 3;}
         if (update.world) {
+            mixer.reset();
             world = mixer.set_world(*update.world) && room::required_clips(*update.world).size() == 1;
             if (!world) return 4;
             mixer.set_listener({0,1.6,-6.2}, 0);
@@ -56,16 +59,27 @@ int run() {
         for(const auto& clip : update.audio_clips) {
             const auto data = std::span(reinterpret_cast<const std::uint8_t*>(clip.bytes.data()), clip.bytes.size());
             auto sample = audio::decode_clip(clip.key, data);
-            if (!world || !sample || !mixer.set_clip(clip.key, sample) || mode != Mode::normal) return 5;
+            if (!world || !sample || !mixer.set_clip(clip.key, sample) || (mode != Mode::normal && mode != Mode::project)) return 5;
             std::array<float,8192> out{};
             mixer.render(out);
             if (!std::any_of(out.begin(),out.end(),[](float v){return std::abs(v) > .05f;})) return 6;
+            if (mode == Mode::project) {
+                const bool destination = update.title == "Biblioteca";
+                const auto signal = out.back();
+                if (!first_room_heard) {
+                    if (destination || signal <= .05f) return 11;
+                    first_room_heard = true;
+                    heard_key = clip.key;
+                    continue;
+                }
+                if (!destination || signal >= -.05f || clip.key == heard_key || info_calls != 2) return 12;
+            }
             client.leave();
             return 0;
         }
         if (world && update.snapshot && info_calls > 0 && (clip_calls > 0 || mode == Mode::legacy)) {
             ++after_download;
-            if (after_download >= 10 && mode != Mode::normal) {
+            if (after_download >= 10 && (mode == Mode::corrupt || mode == Mode::legacy)) {
                 std::array<float,512> out{};
                 mixer.render(out);
                 if (std::any_of(out.begin(),out.end(),[](float v){return v != 0;})) return 7;
@@ -73,7 +87,7 @@ int run() {
                 return 0;
             }
         }
-        if (world) client.input(0,0,false,false);
+        if (world) client.input(first_room_heard ? 1 : 0,0,false,false);
         std::this_thread::sleep_for(8ms);
     }
     return 8;
@@ -126,7 +140,7 @@ Response Http::post(std::string_view action,std::string_view json,std::size_t li
 int main(int argc, char** argv) {
     if(argc != 2) return 9;
     const std::string arg(argv[1]);
-    mode = arg=="normal"?Mode::normal:arg=="corrupt"?Mode::corrupt:Mode::legacy;
+    mode = arg=="normal"?Mode::normal:arg=="corrupt"?Mode::corrupt:arg=="project"?Mode::project:Mode::legacy;
     if(curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) return 10;
     const int result = run();
     curl_global_cleanup();

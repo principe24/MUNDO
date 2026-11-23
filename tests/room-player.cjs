@@ -144,30 +144,9 @@ test("production player mixes a sealed WAV over real HTTP, silences a lost seat 
 });
 
 test("walking through a published portal switches the real client to the second world's WAV",async t=>{
-  const {MundoWorld,MundoProject}=require("../server/room-runtime.cjs");
-  const Clips=require("../web/audio-clips.js"),Project=require("../web/audio-project.js");
-  const Scene=require("../web/audio-scene.js"),{roomFromSource}=require("../server/room.cjs");
-  const {readRoomSource}=require("../server/room-source.cjs");
-  const clips=[],worlds=[],portals=[];
-  for(const id of [1,2]){
-    // Opposite signs distinguish the two recordings exactly after clipping and panning.
-    const clip=await Clips.prepare(Clips.encodeMono(new Float32Array(1200).fill(id===1?.3:-.4)));
-    const world=MundoWorld.empty(),floor=MundoWorld.add(world,"Plaza",1);
-    floor.p=[0,-.25,0];floor.s=[24,.5,24];
-    if(id===1){
-      const tile=MundoWorld.add(world,"Portal/Biblioteca",1);
-      tile.p=[0,.05,2];tile.s=[4,.1,1.5];
-      portals.push({from:1,tile:String(tile.id),to:2});
-    }
-    Scene.add(world,{label:"Emisión",preset:clip.key,position:[0,0,0],radius:10,
-      spatial:"2d",group:"musica",volume:1});
-    worlds.push(await MundoProject.draft(id,world,id===1?"Plaza inicial":"Biblioteca",null,null));
-    clips.push(clip);
-  }
-  const index={name:"Paseo privado",start:1,worlds,portals};
-  const project=await Project.exportProject(index,key=>clips.find(clip=>clip.key===key));
-  const bytes=Buffer.from(await project.blob.arrayBuffer());
-  const room=await roomFromSource(readRoomSource("Paseo.mprojectaudio",bytes)),host=createHost(room,{port:0});
+  const {portalAudioSource}=require("./support/audio-project.cjs");
+  const {roomFromSource}=require("../server/room.cjs");
+  const room=await roomFromSource(await portalAudioSource()),host=createHost(room,{port:0});
   const capture=outputCapture(),origin=await host.start(),revisions=[];
   host.server.on("request",req=>{if(req.url==="/room/audio")revisions.push(room.revision);});
   let guest;

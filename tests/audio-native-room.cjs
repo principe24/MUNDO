@@ -2,14 +2,15 @@
 const path = require("node:path"), fs = require("node:fs"), os = require("node:os");
 const {spawn} = require("node:child_process");
 const {roomFromSource,createHost,playerInvitation} = require("../server/room.cjs");
+const {portalAudioSource} = require("./support/audio-project.cjs");
 const {openRoomSource} = require("../server/room-source.cjs");
 
 async function main() {
   const binary=process.argv[2];
   if(!binary) throw Error("Pass the native room test executable");
   const source=openRoomSource(path.join(__dirname,"../examples/audio/Plaza_del_carillon.mroomaudio"));
-  for(const mode of ["normal","corrupt","legacy"]){
-    const room=await roomFromSource(await source), app=createHost(room,{port:0});
+  for(const mode of ["normal","corrupt","legacy","project"]){
+    const room=await roomFromSource(mode==="project"?await portalAudioSource():await source), app=createHost(room,{port:0});
     const origin=await app.start();
     try {
       const child=spawn(binary,[mode],{stdio:["pipe","inherit","inherit"]});

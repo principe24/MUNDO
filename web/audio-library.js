@@ -114,5 +114,15 @@ globalThis.MundoAudioLibrary = (() => {
     await save(pending);
     return {room,info,world,hasModels:Boolean(models)};
   }
-  return Object.freeze({list,get,importFile,packRoom,openRoom});
+  async function openProject(file,accept) {
+    if (!(file instanceof Blob) || file.size > MundoAudioProject.maxBytes)
+      throw Error("Archivo de proyecto con audio demasiado grande.");
+    const loaded=await MundoAudioProject.open(new Uint8Array(await file.arrayBuffer()));
+    if (!accept(loaded.index)) return null;
+    // All maps, hashes and references have been verified; write the complete sound
+    // inventory in a single IndexedDB transaction before replacing the open project.
+    await save(loaded.items);
+    return loaded.index;
+  }
+  return Object.freeze({list,get,importFile,packRoom,openRoom,openProject});
 })();

@@ -119,14 +119,15 @@ globalThis.MundoAudioClips = (() => {
     return decode(bytes);
   }
   function hasModels(base) {return txt(base,0,8)==="MROOM3D1";}
-  function unpack(input){
+  const maxProjectBase=64*1024*1024;
+  function unpackBank(input,project){
     const b=bin(input);
     const magic=txt(b,0,8), combined=magic==="MWAUDIO2";
-    check(b.length>=16 && b.length<=maxRoomBytes && (combined || magic==="MWAUDIO1"),"Archivo de sala con audio inválido.");
+    check(b.length>=16 && b.length<=(project?16+maxProjectBase+maxBankBytes+36*maxSources:maxRoomBytes) && (project?magic==="MPRAUD01":combined || magic==="MWAUDIO1"),"Archivo de sala con audio inválido.");
     const v=new DataView(b.buffer,b.byteOffset,b.byteLength),base=v.getUint32(8,true),count=v.getUint32(12,true);
-    check(base>=24 && base<=(combined?maxModelBase:maxBase) && count>0 && count<=maxSources && 16+base+count*36<=b.length,"Directorio de audio inválido.");
+    check(base>=24 && base<=(project?maxProjectBase:combined?maxModelBase:maxBase) && count>0 && count<=maxSources && 16+base+count*36<=b.length,"Directorio de audio inválido.");
     const room=b.subarray(16,16+base), items=[];let at=16+base,previous="",total=0;
-    check(hasModels(room)===combined,"La cabecera de audio no coincide con la sala adjunta.");
+    check(project?txt(room,0,8)==="MUNDOPRJ":hasModels(room)===combined,"La cabecera de audio no coincide con la sala adjunta.");
     for(let i=0;i<count;i++){
       check(at+36<=b.length,"Entrada de audio incompleta.");
       const hash=hex(b.subarray(at,at+32)), key=keyOf(hash), size=v.getUint32(at+32,true);at+=36;total+=size;
@@ -136,13 +137,13 @@ globalThis.MundoAudioClips = (() => {
     check(at===b.length,"Datos sobrantes en la sala con audio.");
     return {room,items};
   }
-  async function pack(input,collection){
+  async function packBank(input,collection,project){
     const room=bin(input),items=[...collection].sort((a,b)=>a.key.localeCompare(b.key));
     const combined=hasModels(room);
-    check(room.length>=24 && room.length<=(combined?maxModelBase:maxBase) && items.length && items.length<=maxSources,"Elige una sala con grabaciones.");
+    check(room.length>=24 && room.length<=(project?maxProjectBase:combined?maxModelBase:maxBase) && (!project || txt(room,0,8)==="MUNDOPRJ") && items.length && items.length<=maxSources,"Elige una sala con grabaciones.");
     const total=items.reduce((n,item)=>n+item.bytes.length,0);check(total<=maxBankBytes,"La sala admite hasta 8 MiB de grabaciones.");
     const b=new Uint8Array(16+room.length+36*items.length+total),v=new DataView(b.buffer);
-    ascii(b,0,combined?"MWAUDIO2":"MWAUDIO1");v.setUint32(8,room.length,true);v.setUint32(12,items.length,true);b.set(room,16);
+    ascii(b,0,project?"MPRAUD01":combined?"MWAUDIO2":"MWAUDIO1");v.setUint32(8,room.length,true);v.setUint32(12,items.length,true);b.set(room,16);
     let at=16+room.length,previous="";
     const entries=[];
     // Freeze payloads and metadata before the first asynchronous hash. The bank
@@ -162,10 +163,13 @@ globalThis.MundoAudioClips = (() => {
     }
     return b;
   }
+  const pack=(input,items)=>packBank(input,items,false), unpack=input=>unpackBank(input,false);
+  const packProjectBank=(input,items)=>packBank(input,items,true);
+  function unpackProjectBank(input){const {room,items}=unpackBank(input,true);return {project:room,items};}
   function match(sources,items){
     const keys=new Set(sources.map(s=>s.preset).filter(p=>/^s[0-9a-f]{16}$/.test(p)));
     check(keys.size===items.length && items.every(item=>keys.delete(item.key)) && keys.size===0,"Las grabaciones deben corresponder exactamente a las fuentes de la sala.");
   }
-  return Object.freeze({decode,canonical,encodeMono,prepare,verify,pack,unpack,match,hasModels,maxClipBytes,maxRoomBytes,maxBankBytes,rate});
+  return Object.freeze({decode,canonical,encodeMono,prepare,verify,pack,unpack,packProjectBank,unpackProjectBank,match,hasModels,maxClipBytes,maxRoomBytes,maxBankBytes,rate});
 })();
 if(typeof module!=="undefined" && module.exports)module.exports=globalThis.MundoAudioClips;

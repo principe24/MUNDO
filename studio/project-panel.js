@@ -8,7 +8,7 @@ window.MundoProjectPanel = function({captureDraft, selectedPublication, beginEdi
   const systemShare = typeof navigator.share === "function" && typeof navigator.canShare === "function" &&
     typeof File === "function";
   let shareGeneration = 0, shareFile = null;
-  const fileName = value => (value.replace(/[^\p{L}\p{N}_-]+/gu,"_").slice(0,65) || "Juego") + ".mproject";
+  const fileName = (value,extension=".mproject") => (value.replace(/[^\p{L}\p{N}_-]+/gu,"_").slice(0,65) || "Juego") + extension;
   const selected = () => worlds.find(entry => entry.id === Number(list.value));
   const title = () => name.value.trim();
   function status(message) { el("projectStatus").textContent = message; }
@@ -86,7 +86,7 @@ window.MundoProjectPanel = function({captureDraft, selectedPublication, beginEdi
     el("projectRelease").disabled = worlds.length >= MundoProject.maxWorlds || !selectedPublication();
     for (const id of ["projectEdit","projectUpdate","projectRemove"]) el(id).disabled = !chosen;
     el("projectStart").disabled = !chosen || chosen.id === start;
-    el("projectSave").disabled = !worlds.length || !title();
+    el("projectSave").disabled = el("projectSaveAudio").disabled = !worlds.length || !title();
     el("projectPlay").hidden = busy || !worlds.length || !title();
     for (const link of hostedPractices) link.hidden = busy || chosen?.hash !== link.dataset.roomSha256;
   }
@@ -206,27 +206,45 @@ window.MundoProjectPanel = function({captureDraft, selectedPublication, beginEdi
     const file = fileInput.files[0]; fileInput.value = "";
     if (!file) return;
     run(async () => {
-      const next = await MundoProject.open(file);
-      if (worlds.length && !window.confirm("¿Abrir «" + next.name + "» y sustituir la colección actual del proyecto?")) return;
+      const accept = index => !worlds.length || window.confirm("¿Abrir «" + index.name + "» y sustituir la colección actual del proyecto?");
+      const magic = await file.slice(0,8).text();
+      let next;
+      if (magic === "MPRAUD01") {
+        next = await MundoAudioLibrary.openProject(file,accept);
+        if (!next) return;
+      } else {
+        next = await MundoProject.open(file);
+        if (!accept(next)) return;
+      }
       worlds = next.worlds; portals=next.portals; start = next.start; name.value = next.name;
+      el("projectPlayAudio").checked=false;
       studioPlugins = next.studioPlugins; plugins.useProfile(studioPlugins);
       render(start);
       status("Proyecto abierto. «Editar mundo elegido» abre una copia en el borrador.");
     });
   };
-  el("projectSave").onclick = () => run(async () => {
-    const project = {name:title(), start, worlds, portals, studioPlugins};
-    const blob = shareFile || await MundoProject.pack(project);
+  function download(blob,filename) {
     const url = URL.createObjectURL(blob), a = document.createElement("a");
     try {
       a.href = url;
-      a.download = fileName(project.name);
+      a.download = filename;
       document.body.append(a); a.click(); status("Descarga solicitada. Puedes prepararlo en el panel del anfitrión.");
     } finally { a.remove(); setTimeout(() => URL.revokeObjectURL(url),60000); }
+  }
+  const current = () => ({name:title(),start,worlds,portals,studioPlugins});
+  el("projectSave").onclick = () => run(async () => {
+    const project = current();
+    download(shareFile || await MundoProject.pack(project),fileName(project.name));
+  });
+  el("projectSaveAudio").onclick = () => run(async () => {
+    const project = current(), result = await MundoAudioProject.exportProject(project,MundoAudioLibrary.get);
+    if (!result.hasAudio) throw Error("Añade una fuente con un WAV importado para exportar sus grabaciones.");
+    download(result.blob,fileName(project.name,".mprojectaudio"));
   });
   MundoPrepararSala(el("projectPlay"),()=>{
     if(busy || !worlds.length)throw Error("Añade un mundo al proyecto.");
-    return {project:{name:title(),start,worlds:worlds.slice(),portals:portals.slice()}};
+    return {project:{name:title(),start,worlds:worlds.slice(),portals:portals.slice()},
+      includeAudio:el("projectPlayAudio").checked};
   },status);
   renderTiles();
   return {sync};

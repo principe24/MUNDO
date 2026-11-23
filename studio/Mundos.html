@@ -275,7 +275,8 @@
             <div class="actions"><button type="button" id="projectPluginCapture" disabled>Fijar los plugins activos del catálogo</button><button type="button" id="projectPluginClear" disabled>Usar el catálogo del navegador</button></div>
             <p id="projectPluginStatus" role="status" aria-live="polite"></p>
           </fieldset>
-          <div class="actions"><button id="projectOpen">Abrir proyecto</button><button id="projectSave">Guardar proyecto</button><button id="projectShare" hidden>Compartir proyecto…</button></div>
+          <div class="actions"><button id="projectOpen">Abrir proyecto</button><button id="projectSave">Guardar proyecto</button><button id="projectSaveAudio">Exportar proyecto con grabaciones</button><button id="projectShare" hidden>Compartir proyecto…</button></div>
+          <label><input type="checkbox" id="projectPlayAudio"> Incluir las grabaciones referenciadas al preparar la sala</label>
           <button type="button" id="projectPlay" hidden>Preparar sala del proyecto</button>
           <a id="projectHostedPractice" href="https://mundo-lonja-salida-lanzada.kyjhv6fcgk.chatgpt.site/"
              data-room-sha256="44a13f6542cb1434058f31645e5de6f400d0283543e494b11a71081d0acd0085"
@@ -283,7 +284,7 @@
           <a href="https://mundo-lonja-salida-lanzada.kyjhv6fcgk.chatgpt.site/anden/"
              data-room-sha256="b814d6496dce13ddeb5cf8ecb3701a4b3bf3b56f416aff346bcfb5eb6c311217"
              target="_blank" rel="noopener noreferrer" hidden>Jugar desde el Andén en línea</a>
-          <input id="projectFile" type="file" accept=".mproject" hidden>
+          <input id="projectFile" type="file" accept=".mproject,.mprojectaudio" hidden>
         </fieldset><p id="projectStatus" role="status"></p>
       </section>
       <section aria-labelledby="circuitTitle"><h2 id="circuitTitle">Circuito del borrador</h2>
@@ -464,5 +465,5 @@
   <script src="vehicle-model.js"></script>
   <script src="patio-template.js"></script>
   <script src="../web/course-timing.js"></script><script src="course-timing-panel.js"></script>
-  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="../web/navigation-3d.js"></script><script src="npc-preflight.js"></script><script src="npc-panel.js"></script><script src="../web/audio-scene.js"></script><script src="../web/audio-clips.js"></script><script src="../web/audio-library.js"></script><script src="../web/audio-dsp.js"></script><script src="../web/audio-output.js"></script><script src="audio-panel.js"></script><script src="editor.js"></script>
+  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="../web/navigation-3d.js"></script><script src="npc-preflight.js"></script><script src="npc-panel.js"></script><script src="../web/audio-scene.js"></script><script src="../web/audio-clips.js"></script><script src="../web/audio-project.js"></script><script src="../web/audio-library.js"></script><script src="../web/audio-dsp.js"></script><script src="../web/audio-output.js"></script><script src="audio-panel.js"></script><script src="editor.js"></script>
 </body></html>

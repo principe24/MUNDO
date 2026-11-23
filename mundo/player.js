@@ -5,6 +5,26 @@
   const invite=trial?null:MundoEntrada.enter();
   if(!trial && invite===null)return;
   const inRoom=!trial;
+  const audio=window.MundoPlayerAudio?.create(window,MundoView.mobile);
+  let roomClips=null;
+  function audioForm(settings){
+    if(!audio || !settings)return;
+    el("audioVolume").value=settings.volume;
+    el("audioMute").checked=settings.muted;
+    for(const group of audio.groups)el("audio-"+group).value=settings[group];
+  }
+  if(audio){
+    function unlockSound(){if(!document.hidden)void audio.activate();}
+    document.addEventListener("pointerup",unlockSound);
+    document.addEventListener("keydown",unlockSound);
+    el("audioEnable").onclick=async()=>{
+      const ready=await audio.activate(true);
+      el("audioStatus").textContent=ready?"Salida de audio activa.":"El navegador no pudo activar el audio. Vuelve a intentarlo.";
+    };
+    document.addEventListener("visibilitychange",()=>audio.setActive(!document.hidden && (!inRoom || (online && !sectorWaiting))));
+    window.addEventListener("pagehide",event=>{if(event.persisted)audio.setActive(false);else audio.clear();});
+    if(!inRoom)window.addEventListener("pageshow",()=>audio.setActive(!document.hidden));
+  }
   if(inRoom)canvas.parentElement.classList.add("awaiting-room");
   const view=new MundoView.View(canvas,s=>{
     el("stats").textContent=(s.mode?s.mode+" · ":"")+s.fps+" FPS · "+s.width+" × "+s.height;
@@ -57,6 +77,7 @@
     if(courseClock.textContent!==clock)courseClock.textContent=clock;
   }
   function coverScene(){
+    audio?.setActive(false);roomClips?.pause();
     clearNpcs();
     displayCourse(null);
     canvas.parentElement.classList.add("awaiting-room");
@@ -185,6 +206,7 @@
       const pivot=roomCar && window.MundoBrumaLook?.seat(car,riding);
       const [cx,cz]=pivot?[pivot[0],pivot[2]]:roomCar?car.point((riding?1:-1)*car.width*.36,0):[car.x,car.z];
       const eye=[cx,car.top+.36,cz];
+      audio?.listen(eye,angle);
       const chase=thirdPerson&&view.gpuReady&&rig.follow(road,eye,forward,car.length+4);
       view.look=chase||{eye,target:eye.map((v,i)=>v+forward[i])};
       if(roomCar&&chase){rig.sit(car,riding);view.actorParts=rig.parts;}
@@ -192,6 +214,7 @@
     }else{
       const p=avatar.position,eye=[p[0],p[1]+1.58,p[2]],cp=Math.cos(pitch);
       const forward=[cp*Math.sin(yaw),Math.sin(pitch),-cp*Math.cos(yaw)];
+      audio?.listen(eye,yaw);
       rig.update(avatar,yaw,dt);
       const chase=thirdPerson && view.gpuReady && rig.follow(roomCar?.walkCamera??avatar,eye,forward);
       view.look=chase||{eye,target:eye.map((n,i)=>n+forward[i])};
@@ -244,7 +267,9 @@
       }
     }
     streaming=null;
+    audio?.setActive(false);
     install(geometry,next,name,previewCars,projectLocation);
+    audio?.install(world);audio?.setActive(!document.hidden);
   }
   function install(geometry,next,name,availableCars=MundoDriving.discover(geometry),projectLocation=null){
     activeProject=projectLocation;
@@ -262,7 +287,12 @@
     const objects=await archive.nearby(cx,cz,zoneRadius);
     if(ticket!==loadTicket)return;
     const character=new MundoWalk(objects,false);character.floor=archive.floor;
+    audio?.setActive(false);
     install({byId:archive.global.byId,objects},character,file.name.replace(/\.mzones$/i,""));
+    if(audio){
+      const nodes=new Map([...archive.global.byId].map(([id,entry])=>[id,entry.n]));
+      audio.install({nodes});audio.setActive(!document.hidden);
+    }
     streaming={archive,cx,cz,waiting:false,failed:false};
     el("notice").textContent="";
   }
@@ -413,12 +443,12 @@
     if(!menu.open && travelTicket!==null && travelTicket===loadTicket){
       ++loadTicket;travelTicket=null;destinations.disabled=false;notify("Viaje cancelado al abrir los ajustes.");
     }
-    releaseInput();listDestinations();form(view.settings);
+    releaseInput();listDestinations();form(view.settings);audioForm(audio?.settings);
     el("videoDimensions").textContent=view.videoDimensions();el("feedback").textContent="";
     if(!menu.open)menu.showModal();
   }
   el("family").textContent=MundoView.mobile?"Perfil de este móvil o tableta":"Perfil de esta PC";
-  el("settings").onclick=openMenu;el("reset").onclick=()=>form(MundoView.defaults());
+  el("settings").onclick=openMenu;el("reset").onclick=()=>{form(MundoView.defaults());audioForm(audio?.defaults);};
   el("cancel").onclick=()=>menu.close();menu.addEventListener("close",()=>{
     if(travelTicket!==null && travelTicket===loadTicket)++loadTicket;
     travelTicket=null;destinations.disabled=false;
@@ -427,7 +457,13 @@
   el("video").onsubmit=e=>{
     e.preventDefault();try{
       const saved=view.applySettings({resolution:Number(el("resolution").value),cap:el("cap").valueAsNumber,detail:el("detail").value});
-      menu.close();if(!saved)el("notice").textContent="Ajustes aplicados a esta sesión. El navegador tiene desactivado el guardado local.";
+      let audioSaved=true;
+      if(audio){
+        const levels=Object.fromEntries(audio.groups.map(group=>[group,Number(el("audio-"+group).value)]));
+        audioSaved=audio.apply({...levels,volume:Number(el("audioVolume").value),muted:el("audioMute").checked});
+        void audio.activate();
+      }
+      menu.close();if(!saved || !audioSaved)el("notice").textContent="Ajustes aplicados a esta sesión. El navegador tiene desactivado el guardado local.";
     }catch(error){el("feedback").textContent=error.message;}
   };
   const moves=new Set(["KeyW","KeyS","KeyA","KeyD","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","ShiftLeft","ShiftRight"]);
@@ -484,6 +520,8 @@
       try{sessionStorage.setItem(key,proof);}catch{}
     }
     link=new MundoRoomLink(invite,proof);
+    if(audio)roomClips=MundoPlayerAudio.roomClips(link,audio,window.MundoAudioClips,mundoRoomBytes,
+      message=>{el("audioClipStatus").textContent=message;});
     const roomModels=MundoRoomModels(view,link,message=>{el("modelNotice").textContent=message;});
     const status=message=>{el("notice").textContent=message;};
     let active=false,generation=0,timer=null,pending=Promise.resolve(),peers=-1;
@@ -608,6 +646,7 @@
         replica=new MundoRoomCar(car,geometry,carState,area?.terrain??admission.road);
       }
       streaming=null;
+      audio?.setActive(false);audio?.install(admission.world);
       install(geometry,next,admission.title,available);
       roomCar=replica;roomResidence=residence;
     }
@@ -624,9 +663,11 @@
         if(driving)driving=car;
         roomCar=next;
       }
+      audio?.install(admission.world);
       cars=available;changeRoomTerrain(geometry,terrain);
     }
     function clearRoom(){
+      roomClips?.clear();audio?.clear();
       roomModels.clear();
       coverScene();suspendRoomTerrain();roomResidence=null;el("world").textContent="Sala privada";
       guideToCar(null,null);
@@ -684,6 +725,7 @@
         }
       }
       function holdScene(){
+        audio?.setActive(false);roomClips?.pause();
         sectorWaiting=false;
         if(!entryView)coverScene();
         suspendRoomTerrain();
@@ -759,6 +801,7 @@
           if(!link.followSector(admission,self,snap.car)){
             lastSnapshot=performance.now();
             if(!sectorWaiting){
+              audio?.setActive(false);roomClips?.pause();
               sectorWaiting=true;seatRequest=null;meetingIntent=null;releaseInput();
               if(returnDialog.open)returnDialog.close();
               controls();status("Cargando el terreno de la partida…");
@@ -803,6 +846,7 @@
           const rolledBack=!online && link.project && link.route?.phase===2;
           snapAfterReturn=false;
           lastSnapshot=performance.now();online=true;displayCourse(snap.course);
+          audio?.setActive(!document.hidden);roomClips?.update();
           roomModels.update();
           if(ownerPeople)link.roomActor(ownerPeople);
           if(vehicleLook)link.roomBruma(vehicleLook,MundoBrumaLook.isBruma(roomCar?.car));

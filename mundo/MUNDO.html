@@ -35,6 +35,15 @@
       <label for="travelWorld">Destino</label><select id="travelWorld"></select>
       <p id="travelInfo" role="status"></p><button type="button" id="travelGo">Entrar al mundo</button>
     </fieldset>
+    <fieldset><legend>Sonido</legend>
+      <label for="audioVolume">Volumen general</label><input type="range" id="audioVolume" min="0" max="100" value="80">
+      <label for="audio-ambiente">Ambiente</label><input type="range" id="audio-ambiente" min="0" max="100" value="100">
+      <label for="audio-efectos">Efectos</label><input type="range" id="audio-efectos" min="0" max="100" value="100">
+      <label for="audio-musica">Música</label><input type="range" id="audio-musica" min="0" max="100" value="100">
+      <label><input type="checkbox" id="audioMute"> Silenciar la partida</label>
+      <button type="button" id="audioEnable">Activar salida de audio</button>
+      <p id="audioStatus" role="status"></p><p id="audioClipStatus" role="status"></p>
+    </fieldset>
     <p id="videoDimensions"></p>
     <fieldset id="ownerPeopleOptions" hidden><legend>Apariencia del personaje</legend>
       <label for="ownerPeopleFile">Usar una apariencia de este dispositivo</label>
@@ -58,4 +67,4 @@
       <button type="button" id="confirmReturn" class="primary">Volver al encuentro</button></div>
   </dialog>
 </main><script src="../web/world.js"></script><script src="../web/starting-content.js"></script><script src="../web/geometry.js"></script><script src="../web/zones.js"></script>
-<script src="../web/view.js"></script><script src="walk.js"></script><script src="avatar.js"></script><script src="drive.js"></script><script src="../web/bruma-look.js"></script><script src="../web/meeting.js"></script><script src="../web/room-file.js"></script><script src="../web/circuit.js"></script><script src="../web/component-record.js"></script><script src="../web/project.js"></script><script src="residence.js"></script><script src="sectors.js"></script><script src="room.js"></script><script src="../web/creator-mesh.js"></script><script src="room-models.js"></script><script src="entrada.js"></script><script src="../web/people-rig.js"></script><script src="online-people.js"></script><script src="player.js"></script></body></html>
+<script src="../web/view.js"></script><script src="walk.js"></script><script src="avatar.js"></script><script src="drive.js"></script><script src="../web/bruma-look.js"></script><script src="../web/meeting.js"></script><script src="../web/room-file.js"></script><script src="../web/circuit.js"></script><script src="../web/component-record.js"></script><script src="../web/project.js"></script><script src="residence.js"></script><script src="sectors.js"></script><script src="room.js"></script><script src="../web/creator-mesh.js"></script><script src="room-models.js"></script><script src="entrada.js"></script><script src="../web/people-rig.js"></script><script src="online-people.js"></script><script src="../web/audio-clips.js"></script><script src="../web/audio-scene.js"></script><script src="../web/audio-dsp.js"></script><script src="../web/audio-output.js"></script><script src="scene-audio.js"></script><script src="player.js"></script></body></html>

@@ -1,6 +1,6 @@
 # Mundo Engie
 
-**Versión privada 0.56.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
+**Versión privada 0.57.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
 
 Mundo Engie es el motor de MUNDO Studio, la aplicación de creación, y de MUNDO, la plataforma donde la gente entra a jugar las experiencias en línea. Los creadores pueden diseñar mapas de géneros y estilos distintos. El formato `.mworld` guarda sus escenas. Las casas, los vehículos y los objetos pueden utilizar modelos tridimensionales con superficies y materiales propios. El detalle gráfico se ajusta por dispositivo.
 

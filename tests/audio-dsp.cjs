@@ -138,3 +138,29 @@ test("el bus de voces se puede mezclar y silenciar de forma independiente",()=>{
   m.setGroupVolume("voces",0);
   assert.equal(rms(render(m)[0]),0);
 });
+
+test("pausar una voz mantiene su muestra exacta y las demás siguen avanzando",()=>{
+  const m=dsp.create(sampleRate);
+  const first=source({preset:"brisa",position:[-1,0,0]}),other=source({id:"20",position:[1,0,0]});
+  const reference=setup(first),isolated=setup(other);
+  m.setSources([first,other]);
+  render(m,333);render(reference,333);render(isolated,333);
+  assert.equal(m.setSourcePaused("999",true),false);
+  assert.equal(m.setSourcePaused(first.id,true),true);
+  assert.throws(()=>m.setSourcePaused(first.id,0));
+  m.setSources([first,other]);
+  const [l,r]=render(m,741);
+  assert.ok(l.every(v=>v===0));assert.deepEqual(r,render(isolated,741)[1]);
+  m.setSourcePaused(first.id,false);
+  assert.deepEqual(render(m,1051)[0],render(reference,1051)[0]);
+
+  const event={...first,loop:false,preset:"agua"};
+  m.setSources([event]);m.setSourcePaused(event.id,true);assert.ok(m.trigger(event.id));
+  assert.ok(render(m,600)[0].every(v=>v===0));
+  m.setSourcePaused(event.id,false);
+  assert.deepEqual(render(m,801)[0],render(setup(event),801)[0]);
+  m.setSourcePaused(event.id,true);m.setSources([]);m.setSources([event]);
+  assert.deepEqual(render(m,801)[0],render(setup(event),801)[0]);
+  m.setSourcePaused(event.id,true);m.setSources([first]);
+  assert.deepEqual(render(m,910)[0],render(setup(first),910)[0]);
+});

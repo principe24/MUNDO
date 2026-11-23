@@ -199,3 +199,30 @@ test("only a project's confirmed route may receive a clip and a new world discar
   assert.deepEqual(Object.keys(requested[2]).sort(),["key","lease","revision"]);
   room.clear();
 });
+
+test("la salida recuerda la pausa individual antes del gesto, hasta el siguiente bloque y por revisión",async()=>{
+  const {host,contexts,ticks}=device(),output=Output.create(host);
+  const a={id:"7",preset:"maquina",position:[-1,0,0],volume:1,radius:7};
+  const b={...a,id:"8",position:[1,0,0]};
+  output.setSources([a,b]);
+  assert.equal(output.setSourcePaused("5",true),false);
+  assert.equal(output.setSourcePaused("7",true),true);
+  assert.equal(await output.unlock(),true);
+  const ctx=contexts[0],first=ctx.nodes[0].buffer;
+  assert.ok(first.getChannelData(0).every(v=>v===0));
+  assert.ok(first.getChannelData(1).some(v=>v!==0));
+  const reference=DSP.create(ctx.sampleRate);reference.setSources([a]);
+  const expected=new Float32Array(first.getChannelData(0).length);
+  reference.render(expected,new Float32Array(expected.length));
+  output.setSourcePaused(a.id,false);
+  const previouslySubmitted=ctx.nodes.length;
+  for(const node of ctx.nodes.slice())node.onended?.();
+  ctx.currentTime+=.12;for(const pump of ticks)pump();
+  assert.deepEqual(ctx.nodes[previouslySubmitted].buffer.getChannelData(0),expected);
+  output.setSourcePaused(a.id,true);
+  const resetAt=ctx.nodes.length;
+  output.setSources([]);output.setSources([a,b]);
+  const next=ctx.nodes[resetAt];
+  assert.deepEqual(next.buffer.getChannelData(0),expected);
+  output.close();assert.equal(output.setSourcePaused(a.id,false),false);
+});

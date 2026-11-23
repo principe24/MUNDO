@@ -25,7 +25,7 @@ globalThis.MundoAudioDSP = (() => {
   }
   function voiceFor(source, rate) {
     const rng = seed(source.id);
-    return {source, rng, clip:null, cursor:0, age:0, started:false, done:false, phase:rng / 4294967296, slow:0, fast:0,
+    return {source, rng, clip:null, cursor:0, age:0, started:false, done:false, paused:false, phase:rng / 4294967296, slow:0, fast:0,
       dropAge:0, nextDrop:0, dropLevel:0, dropStep:0, swellStep:(.14 + (rng % 11) * .005) / rate,
       motorStep:(56 + rng % 12) / rate, left:0, right:0, aimL:0, aimR:0,
       stepL:0, stepR:0, ramp:0};
@@ -178,8 +178,16 @@ globalThis.MundoAudioDSP = (() => {
       const i = voices.findIndex(v => v.source.id === String(id));
       if (i < 0 || voices[i].source.loop) return false;
       const voice = voiceFor(voices[i].source, rate);
+      voice.paused = voices[i].paused;
       configure(voice); targets(voice, listener, yaw, rampSamples);
       voices[i] = voice;
+      return true;
+    }
+    function setSourcePaused(id, value) {
+      if (typeof value !== "boolean") throw Error("Estado de pausa de fuente inválido.");
+      const voice = voices.find(v => v.source.id === String(id));
+      if (!voice) return false;
+      voice.paused = value;
       return true;
     }
     function setPaused(value) {
@@ -197,7 +205,7 @@ globalThis.MundoAudioDSP = (() => {
       if (paused || !voices.length) return;
       for (const voice of voices) {
         const s = voice.source, duration = onceSeconds[s.preset], group = groupLevels[s.group];
-        if (!duration && !voice.clip) continue;
+        if (voice.paused || (!duration && !voice.clip)) continue;
         for (let i = 0; i < left.length; ++i) {
           if (voice.done) break;
           ramp(voice);
@@ -221,7 +229,7 @@ globalThis.MundoAudioDSP = (() => {
       }
     }
     function reset() { voices = []; clips.clear(); listener = [0,0,0]; yaw = 0; }
-    return Object.freeze({setSources, setListener, setVolume, setGroupVolume, setPaused, setClip, clearClips, trigger, render, reset});
+    return Object.freeze({setSources, setListener, setVolume, setGroupVolume, setPaused, setSourcePaused, setClip, clearClips, trigger, render, reset});
   }
   return Object.freeze({create});
 })();

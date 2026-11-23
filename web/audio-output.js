@@ -9,6 +9,7 @@ globalThis.MundoAudioOutput = (() => {
     let position = [0, 0, 0], yaw = 0, timer = null, nextTime = 0;
     const queued = new Set(), buffers = [], clips = new Map(), groups = new Map();
 
+    const pausedSources = new Map();
     function stopQueue() {
       if (timer !== null) host.clearInterval(timer);
       timer = null;
@@ -76,6 +77,7 @@ globalThis.MundoAudioOutput = (() => {
           for (const [key, pcm] of clips) mixer.setClip(key, pcm);
           for (const [group, level] of groups) mixer.setGroupVolume(group, level);
           mixer.setSources(sources);
+          for (const id of pausedSources.keys()) mixer.setSourcePaused(id,true);
           mixer.setListener(position, yaw);
           mixer.setPaused(paused);
           gain = context.createGain();
@@ -121,9 +123,25 @@ globalThis.MundoAudioOutput = (() => {
         if (!mixer || closed || paused) return false;
         return mixer.trigger(id);
       },
+      setSourcePaused(id, value) {
+        if (closed) return false;
+        if (typeof value !== "boolean") throw Error("Estado de pausa de fuente inválido.");
+        const key = String(id), source = sources.find(s => s.id === key);
+        if (!source) return false;
+        if (mixer) mixer.setSourcePaused(key,value);
+        if (value) pausedSources.set(key,{preset:source.preset,loop:source.loop ?? true});
+        else pausedSources.delete(key);
+        // Already scheduled PCM belongs to all voices. Keep it playing and apply
+        // this change on the next render instead of skipping other voices' cursors.
+        return true;
+      },
       setSources(next) {
         if (closed) return;
         if (mixer) mixer.setSources(next);
+        for (const [key, prior] of pausedSources) {
+          const source = next.find(s => s.id === key);
+          if (!source || source.preset !== prior.preset || (source.loop ?? true) !== prior.loop) pausedSources.delete(key);
+        }
         sources = next;
         stopQueue();
         pump();
@@ -150,7 +168,7 @@ globalThis.MundoAudioOutput = (() => {
         if (closed) return;
         closed = true;
         releaseContext();
-        sources = []; clips.clear(); groups.clear();
+        sources = []; clips.clear(); groups.clear(); pausedSources.clear();
       }
     };
   }

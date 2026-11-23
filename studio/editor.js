@@ -34,6 +34,7 @@
   function orbit(){
     const h=distance*Math.cos(pitch);
     view.look={eye:[focus[0]+h*Math.sin(yaw),focus[1]+distance*Math.sin(pitch),focus[2]+h*Math.cos(yaw)],target:focus};
+    audioPanel.moveListener();
   }
   function zoom(factor){distance=Math.max(.55,Math.min(2800,distance*factor));orbit();}
   function record(){return {bytes:W.encode(world),components:MundoComponentRecords.snapshot(world),timingOrigin:timingOrigins.get(world),name:el("worldName").value,selection,vehicleRoot,
@@ -140,6 +141,14 @@
     setMarking(marking==="nav-position"?false:"nav-position");
     if(marking){say("Toca una superficie para elegir las coordenadas. Escape cancela.");canvas.focus({preventScroll:true});}
   }});
+  const audioPanel=MundoStudioAudioPanel({edit,world:()=>world,redraw:()=>renderMeeting(),
+    camera:()=>({position:view.look.eye,yaw:-yaw}),
+    mark:()=>{
+      setMarking(marking==="audio-position"?false:"audio-position");
+      if(marking){say("Toca una superficie para colocar la fuente sonora. Escape cancela.");canvas.focus({preventScroll:true});}
+    },
+    cancelMark:()=>{if(marking==="audio-position")setMarking(false);}
+  });
   MundoCourseTimingPanel(async(report,id,fromId,current,action)=>{
     const source=world,ticket=queuedRead,car=chosenDraftCar(),root=car?String(car.rootId):null;
     const fresh=()=>current() && ticket===queuedRead && world===source && String(chosenDraftCar()?.rootId)===root;
@@ -172,7 +181,7 @@
     return true;
   });
   function setMarking(on){
-    marking=on;circuitPanel.marking(on);navPanel.marking(on);
+    marking=on;circuitPanel.marking(on);navPanel.marking(on);audioPanel.marking(on);
     const portal=on==="portal", meeting=on==="meeting";
     el("markMeeting").setAttribute("aria-pressed",String(meeting));
     el("markMeeting").textContent=meeting?"Cancelar marcado":"Marcar sobre el suelo";
@@ -206,7 +215,7 @@
       center:[x,y+.055,z],extent:[.25,.05,.25],radius:.36,
       m:[.5,0,0,0,0,.1,0,0,0,0,.5,0,x,y+.055,z,1]
     }));
-    view.actorParts.push(...navPanel.overlays());
+    view.actorParts.push(...navPanel.overlays(),...audioPanel.overlays());
     if(grid) {
       // A yellow line and its two arrowheads are editor overlays, outside the world data.
       const [x,y,z]=grid.point,forwardX=Math.sin(grid.yaw),forwardZ=-Math.cos(grid.yaw);
@@ -322,12 +331,12 @@
     el("experienceLook").value=MundoExperienceLook.read(world)||"";
     if(!world.nodes.has(selection))selection=null;
     setMarking(false);view.setWorld(world);creatorModels.setWorld(world);el("worldTitle").textContent=el("worldName").value||"Mi mundo";
-    list();inspector();navPanel.refresh();circuitPanel.refresh(selection,practice);refreshVehicleChoices();historyButtons();
+    list();inspector();navPanel.refresh();audioPanel.refresh();circuitPanel.refresh(selection,practice);refreshVehicleChoices();historyButtons();
   }
   function edit(fn,message){
     try{
       const next=W.fork(world), id=fn(next);
-      W.validate(next);MundoCircuit.scan(next);MundoNpcRoutes.definitions(next);MundoComponentRecords.snapshot(next);push(undo,record());redo=[];
+      W.validate(next);MundoCircuit.scan(next);MundoNpcRoutes.definitions(next);MundoAudioScene.read(next);MundoComponentRecords.snapshot(next);push(undo,record());redo=[];
       ++queuedRead;world=next;selection=id;refresh();say(typeof message==="function"?message(id):message);
     }catch(e){say(e.message);return e;}
   }
@@ -347,7 +356,7 @@
     }
     orbit();
   }
-  function choose(id){selection=world.nodes.has(id)?id:null;list();inspector();circuitPanel.select(selection);}
+  function choose(id){selection=world.nodes.has(id)?id:null;list();inspector();circuitPanel.select(selection);audioPanel.select(selection);}
   el("objects").onchange=()=>choose(el("objects").value?BigInt(el("objects").value):null);
   el("search").oninput=list;
   el("worldName").oninput=()=>{++queuedRead;invalidateZones();el("worldTitle").textContent=el("worldName").value||"Mi mundo";};
@@ -410,7 +419,7 @@
   },"Selección retirada. Puedes deshacer el cambio.");
   function install(next,name,chosenRoot=null,point=null,timingOrigin=null){
     if(timingOrigin)timingOrigins.set(next,timingOrigin);
-    MundoCircuit.scan(next);MundoNpcRoutes.definitions(next);push(undo,record());redo=[];world=next;selection=null;vehicleRoot=chosenRoot;meetingPoint=point?.slice()??null;el("worldName").value=name;refresh(null);
+    MundoCircuit.scan(next);MundoNpcRoutes.definitions(next);MundoAudioScene.read(next);push(undo,record());redo=[];world=next;selection=null;vehicleRoot=chosenRoot;meetingPoint=point?.slice()??null;el("worldName").value=name;refresh(null);
     focus=[0,1,0];distance=44;
     const first=view.scene.objects[0];
     if(first && Math.hypot(...first.center)>80){focus=first.center.slice();distance=Math.max(4,Math.min(2800,first.radius*3));}
@@ -657,9 +666,10 @@
     const file=e.target.files[0];e.target.value="";if(!file)return;
     const ticket=++queuedRead;
     try{
-      if(!isModel&&/\.mroom(?:3d)?$/i.test(file.name)){
+      if(!isModel&&/\.mroom(?:3d|audio)?$/i.test(file.name)){
         const room=await MundoPublications.openRoomFile(file);
         if(room.hasModels)await creatorModels.refreshList();
+        if(room.hasAudio)await audioPanel.reloadCatalog();
         if(ticket!==queuedRead)return;
         install(room.world,room.title,room.vehicleRoot,room.meetingPoint,room.worldSource);
         say("Sala v"+room.revision+" abierta como borrador.");
@@ -671,7 +681,11 @@
       if(isModel){
         // Only geometry travels with an inserted model. A world's recommendation belongs to its own root.
         MundoExperienceLook.set(data,null);
-        edit(next=>W.place(next,data,title,[Math.round(focus[0]),0,Math.round(focus[2])]),"Modelo insertado como un único grupo editable.");
+        const audioSources=MundoAudioScene.read(data);
+        for(const source of audioSources)data.nodes.delete(BigInt(source.id));
+        edit(next=>W.place(next,data,title,[Math.round(focus[0]),0,Math.round(focus[2])]),audioSources.length
+          ? "Modelo insertado. Las fuentes de la sala original se conservan en su mundo."
+          : "Modelo insertado como un único grupo editable.");
       }
       else{
         let sourceHash=null;
@@ -700,6 +714,7 @@
         const point=view.pickFloor(x,y);
         if(point && (marking==="gate-add" || marking==="gate-move" || marking==="gate-insert" || marking==="grid-position"))circuitPanel.place(point,marking);
         else if(point && marking==="catalog-object")placeCatalogObject(point);
+        else if(point && marking==="audio-position"){audioPanel.locate(point);setMarking(false);}
         else if(point && marking==="nav-position"){navPanel.locate(point);setMarking(false);}
         else if(point && marking==="portal")placePortal(point);
         else if(point)setMeeting(point);
@@ -710,6 +725,22 @@
   };
   canvas.onlostpointercapture=()=>{drag=null;};
   canvas.addEventListener("wheel",e=>{e.preventDefault();zoom(Math.exp(Math.max(-1,Math.min(1,e.deltaY*.001))));},{passive:false});
+  el("audioExport").onclick=async ()=>{
+    const button=el("audioExport"),message=el("audioStatus");
+    if(button.disabled)return;
+    button.disabled=true;
+    try{
+      if(meetingError || gridError)throw Error(meetingError || gridError);
+      const snapshot=W.fork(world),title=el("worldName").value.trim()||"Mi mundo",root=vehicleRoot,point=meetingPoint?.slice()??null;
+      const packed=await MundoPublications.audioDraft(snapshot,title,root,point);
+      const url=URL.createObjectURL(packed.blob),link=document.createElement("a");
+      try{
+        link.href=url;link.download=packed.filename;document.body.append(link);link.click();
+      }finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+      message.textContent="Descarga solicitada: "+packed.filename+".";
+    }catch(error){message.textContent=error.message;}
+    finally{button.disabled=false;}
+  };
   MundoPrepararSala(el("play"),()=>{
     if(meetingError || gridError)throw new Error(meetingError || gridError);
     return {world,title:el("worldName").value||"Mi mundo",vehicleRoot,meetingPoint:meetingPoint?.slice()??null};

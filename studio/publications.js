@@ -97,7 +97,22 @@ window.MundoPublications=(()=>{
     const room=new Uint8Array(await roomFile.blob.arrayBuffer()), packed=MundoModelRoom.pack(room,items);
     return {filename:roomFile.filename+"3d",blob:new Blob([packed],{type:"application/octet-stream"})};
   }
+  async function audioDraft(world,title,vehicleRoot,meetingPoint){
+    const bytes=MundoWorld.encode(world);
+    const info={title,revision:1,vehicleRoot,meetingPoint,hash:await MundoRoomFile.digest(bytes)};
+    const room=await MundoRoomFile.seal(info,bytes);
+    const packed=await MundoAudioLibrary.packRoom(room,world);
+    const stem=title.replace(/[^\p{L}\p{N}_-]+/gu,"_").slice(0,65)||"Mundo";
+    return {filename:stem+".mroomaudio",blob:new Blob([packed],{type:"application/octet-stream"})};
+  }
   async function openRoomFile(file){
+    if(/\.mroomaudio$/i.test(file.name)){
+      if(file.size>MundoAudioClips.maxRoomBytes)throw Error("La sala de audio excede el tamaño permitido.");
+      const {info,world}=await MundoAudioLibrary.openRoom(new Uint8Array(await file.arrayBuffer()));
+      if(info.vehicleRoot!==undefined)MundoDriving.roomCar(MundoGeometry.flatten(world),info.vehicleRoot);
+      return {hasAudio:true,world,worldSource:MundoWorld.sourceInfo(info.world,info.hash),title:info.title,
+        vehicleRoot:info.vehicleRoot??null,meetingPoint:info.meetingPoint??null,revision:info.revision};
+    }
     const wrapped=/\.mroom3d$/i.test(file.name);
     if(file.size>(wrapped ? MundoModelRoom.maxBytes : MundoRoomFile.maxBytes))throw new Error("La sala excede el tamaño permitido.");
     const raw=new Uint8Array(await file.arrayBuffer()), bundle=wrapped ? MundoModelRoom.unpack(raw) : null;
@@ -107,6 +122,6 @@ window.MundoPublications=(()=>{
     if(bundle){MundoModelRoom.match(world,bundle.items);await MundoCreatorAssets.restore(bundle.items);}
     return {hasModels:Boolean(bundle),world,worldSource:MundoWorld.sourceInfo(info.world,info.hash),title:info.title,vehicleRoot:info.vehicleRoot??null,meetingPoint:info.meetingPoint??null,revision:info.revision};
   }
-  return {publish,load,bytesOf,roomDownload,openRoomFile,withModels,
+  return {publish,load,bytesOf,roomDownload,openRoomFile,withModels,audioDraft,
     get:id=>query("catalog",store=>store.get(id)),list:()=>query("catalog",store=>store.getAll())};
 })();

@@ -201,7 +201,7 @@
           </div>
         </details>
         <button id="shareWorld" class="full" hidden>Compartir archivo .mworld</button>
-        <input type="file" id="inputFile" accept=".mworld,.mroom,.mroom3d" hidden>
+        <input type="file" id="inputFile" accept=".mworld,.mroom,.mroom3d,.mroomaudio" hidden>
       </section>
       <section><details id="navPanel"><summary>Personajes y rutas a pie</summary>
         <fieldset><legend>Posición en la escena</legend>
@@ -229,6 +229,26 @@
         <button type="button" id="navCheck">Comprobar recorrido guardado</button>
         <p id="navReport" role="status" aria-live="polite"></p>
         <p id="navStatus" role="status" aria-live="polite"></p>
+      </details></section>
+      <section><details id="audioPanel"><summary>Audio del mundo</summary>
+        <label for="audioSource">Fuente sonora</label><select id="audioSource"></select>
+        <label for="audioName">Nombre</label><input id="audioName" maxlength="32" value="Ambiente">
+        <label for="audioPreset">Sonido</label><select id="audioPreset"><option value="brisa">Brisa</option><option value="agua">Agua</option><option value="maquina">Máquina</option></select>
+        <div class="actions"><label>Alcance (m)<input id="audioRadius" type="number" min="0.5" max="256" step="0.01" value="12"></label><label>Volumen (%)<input id="audioVolume" type="number" min="0" max="100" step="0.1" value="65"></label></div>
+        <label for="audioWav">Importar WAV al catálogo privado</label><input id="audioWav" type="file" accept=".wav,audio/wav">
+        <div class="actions"><label>Espacio<select id="audioSpatial"><option value="3d">3D · en el mundo</option><option value="2d">2D · sin distancia</option></select></label>
+          <label>Grupo<select id="audioGroup"><option value="ambiente">Ambiente</option><option value="efectos">Efectos</option><option value="musica">Música</option></select></label></div>
+        <div class="actions"><label>Reproducción<select id="audioLoop"><option value="loop">En bucle</option><option value="once">Una vez</option></select></label>
+          <label>Velocidad (×)<input id="audioRate" type="number" min="0.25" max="4" step="0.01" value="1"></label></div>
+        <fieldset><legend>Posición de la fuente (m)</legend>
+          <div class="actions"><label>X <input id="audioX" type="number" step="any" value="0"></label><label>Y <input id="audioY" type="number" step="any" value="0"></label><label>Z <input id="audioZ" type="number" step="any" value="0"></label></div>
+          <button type="button" id="audioPick" aria-pressed="false">Elegir sobre una superficie</button>
+        </fieldset>
+        <div class="actions"><button type="button" id="audioCreate">Crear fuente</button><button type="button" id="audioApply">Guardar cambios</button><button type="button" id="audioCopy">Duplicar</button><button type="button" id="audioRemove">Quitar</button></div>
+        <div class="actions"><button type="button" id="audioSolo">Escuchar fuente</button><button type="button" id="audioMix">Escuchar mezcla guardada desde la cámara</button><button type="button" id="audioStop">Detener</button></div>
+        <button type="button" id="audioExport">Exportar sala con los sonidos seleccionados (.mroomaudio)</button>
+        <p>Al exportar autorizas incluir los archivos de audio usados en este mundo. Los demás sonidos se quedan en tu catálogo.</p>
+        <p id="audioStatus" role="status" aria-live="polite"></p>
       </details></section>
       <section><h2>Proyecto de juego</h2>
         <fieldset id="projectControls"><label for="projectName">Nombre del proyecto</label>
@@ -439,5 +459,5 @@
   <script src="vehicle-model.js"></script>
   <script src="patio-template.js"></script>
   <script src="../web/course-timing.js"></script><script src="course-timing-panel.js"></script>
-  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="../web/navigation-3d.js"></script><script src="npc-preflight.js"></script><script src="npc-panel.js"></script><script src="editor.js"></script>
+  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="../web/navigation-3d.js"></script><script src="npc-preflight.js"></script><script src="npc-panel.js"></script><script src="../web/audio-scene.js"></script><script src="../web/audio-clips.js"></script><script src="../web/audio-library.js"></script><script src="../web/audio-dsp.js"></script><script src="../web/audio-output.js"></script><script src="audio-panel.js"></script><script src="editor.js"></script>
 </body></html>

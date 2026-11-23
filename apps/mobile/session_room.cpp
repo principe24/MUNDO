@@ -253,7 +253,7 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
         camera.forward = {cp * std::sin(play.look.yaw), std::sin(play.look.pitch), -cp * std::cos(play.look.yaw)};
         show_self = play.look.third_person && play.actors.follow_pedestrian(camera, play.scene.terrain());
     }
-    play.audio.frame(*feet, std::atan2(camera.forward.x, -camera.forward.z));
+    if (room_audio_allowed_) play.audio.frame(*feet, std::atan2(camera.forward.x, -camera.forward.z));
     const bool submitted=surface_->frame_with_peer(play.scene.world(), camera, caps, show_self ? play.actors.local_avatar() : nullptr,
                               play.actors.peer_avatar(),play.actors.vehicles(),play.actors.npc_avatars());
     if(submitted)play.presented=true;

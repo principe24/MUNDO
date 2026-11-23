@@ -22,6 +22,7 @@ std::unique_ptr<AudioDevice> open_audio_device(void* owner, RenderAudio render);
 class PlaybackAudio {
 public:
     ~PlaybackAudio() { suspend(); }
+    bool has_sources() const noexcept { return enabled_; }
 
     void install(const World& world, bool new_session) {
         const auto scene = audio::read_scene(world);

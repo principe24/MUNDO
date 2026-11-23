@@ -41,6 +41,13 @@ public:
     bool join_room(std::string_view ascii_link);
     void leave_room();
     void set_room_active(bool active);
+    void set_room_audio_allowed(bool allowed) {
+        room_audio_allowed_ = allowed;
+        if (!allowed && room_) room_->audio.suspend();
+    }
+    bool room_wants_audio() const {
+        return room_ready() && room_->audio.has_sources();
+    }
     void trim_world_cache();
     void set_device_budget(std::uint64_t bytes, bool low_memory, bool low_power) {
         if (low_memory) trim_world_cache();
@@ -130,7 +137,7 @@ private:
     std::optional<RoomScene> room_;
     std::string room_status_;
     unsigned room_status_revision_{};
-    bool room_active_{true};
+    bool room_active_{true}, room_audio_allowed_{true};
 #endif
     std::filesystem::path storage_;
     std::uint64_t world_key_{};

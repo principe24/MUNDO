@@ -1,14 +1,20 @@
 # Mundo Engie
 
-**Versión privada 0.59.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
+**Versión privada 0.60.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
 
 Mundo Engie es el motor de MUNDO Studio, la aplicación de creación, y de MUNDO, la plataforma donde la gente entra a jugar las experiencias en línea. Los creadores pueden diseñar mapas de géneros y estilos distintos. El formato `.mworld` guarda sus escenas. Las casas, los vehículos y los objetos pueden utilizar modelos tridimensionales con superficies y materiales propios. El detalle gráfico se ajusta por dispositivo.
 
 **Meta del propietario.** Desarrollar un motor propio de propósito general con un alcance comparable a Unreal. MUNDO y MUNDO Studio son las primeras aplicaciones del motor.
 
+## Música larga de Studio a una sala privada · 0.60.0
+
+Studio importa una pista WAV de hasta 16 minutos, la convierte a PCM mono de 24 kHz y la divide en segmentos de 12 segundos identificados por SHA-256. El archivo `.mroommusic` conserva la sala sellada y su inventario ordenado. El anfitrión entrega solamente los segmentos de la revisión admitida y el reproductor conserva una ventana máxima de dos segmentos, cancela las descargas al salir y puede repetir la pista desde el principio.
+
+[Publicación, autorización y pruebas de música larga](docs/AUDIO_060.md)
+
 ## Ventana acotada para música larga · 0.59.0
 
-El motor nativo y el reproductor web aceptan música como una secuencia ordenada de segmentos PCM verificados. Conservan únicamente el segmento que suena y el siguiente, continúan en la frontera de muestra y descartan la cola cuando cambia la revisión. Esta entrega cierra el núcleo de reproducción de `audio-03`. La publicación y descarga autorizada de la lista de segmentos siguen abiertas.
+El motor nativo y el reproductor web aceptan música como una secuencia ordenada de segmentos PCM verificados. Conservan únicamente el segmento que suena y el siguiente, continúan en la frontera de muestra y descartan la cola cuando cambia la revisión. Esta entrega cerró el núcleo de reproducción de `audio-03`.
 
 [Estado, límites y comprobaciones de música segmentada](docs/AUDIO_059.md)
 

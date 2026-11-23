@@ -3,6 +3,9 @@ package studio.mundo.player;
 import android.app.*;
 import android.os.Bundle;
 import android.media.AudioManager;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
+import android.os.Handler;
 import android.os.PowerManager;
 import android.content.Intent;
 import android.content.ComponentCallbacks2;
@@ -33,7 +36,10 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
     private static native boolean saveRoomLevels(long h,int[] values);
     private static native boolean roomWantsAudio(long h);
     private static native void roomAudioAllowed(long h,boolean allowed);
+    private static native void roomAudioRouteChanged(long h);
     private RoomAudioFocus roomFocus;
+    private AudioManager audioManager;
+    private AudioDeviceCallback audioRoute;
     private static native boolean entryVisible(long h);
     static native String invitationOrigin(String link);
     private static native boolean joinRoom(long h,String link);
@@ -90,10 +96,18 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
         powerManager=(PowerManager)getSystemService(POWER_SERVICE);
         handle=create();
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
+        audioManager=(AudioManager)getSystemService(AUDIO_SERVICE);
         roomAudioAllowed(handle,false);
-        roomFocus=new RoomAudioFocus((AudioManager)getSystemService(AUDIO_SERVICE),
+        roomFocus=new RoomAudioFocus(audioManager,
                 allowed->{if(handle!=0)roomAudioAllowed(handle,allowed);});
         if(handle==0){notice("MUNDO no pudo iniciar.");finish();return;}
+        if(audioManager!=null){
+            audioRoute=new AudioDeviceCallback(){
+                @Override public void onAudioDevicesAdded(AudioDeviceInfo[] devices){refreshAudioRoute();}
+                @Override public void onAudioDevicesRemoved(AudioDeviceInfo[] devices){refreshAudioRoute();}
+            };
+            audioManager.registerAudioDeviceCallback(audioRoute,new Handler(getMainLooper()));
+        }
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_FULLSCREEN);
         FrameLayout layout=new FrameLayout(this);
@@ -342,6 +356,12 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
         leap.setVisibility(!playable||passenger?View.GONE:View.VISIBLE);
         if(changed||aboard!=shownDriving)updatePedal();
     }
+    private void refreshAudioRoute(){
+        if(handle==0 || roomFocus==null)return;
+        roomAudioRouteChanged(handle);
+        roomFocus.restart(active && ready && hasWindowFocus() && roomWantsAudio(handle));
+        nextRoomStatusUpdate=0;
+    }
     private void releaseBrake(){
         if((brakePointer>=0 || accessibleBrake) && handle!=0)brake(handle,false);
         brakePointer=-1;
@@ -477,6 +497,10 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
         if(invitationDialog!=null)invitationDialog.dismiss();
         ready=false;
         active=false;
+        if(audioManager!=null && audioRoute!=null){
+            audioManager.unregisterAudioDeviceCallback(audioRoute);
+            audioRoute=null;
+        }
         if(roomFocus!=null)roomFocus.update(false);
         schedule();
         long retired=handle;

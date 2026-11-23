@@ -109,6 +109,9 @@ JNIEXPORT jboolean JNICALL N(roomWantsAudio)(JNIEnv*,jclass,jlong h){return h &&
 JNIEXPORT void JNICALL N(roomAudioAllowed)(JNIEnv*,jclass,jlong h,jboolean allowed){
     if(h)host(h)->game.set_room_audio_allowed(allowed);
 }
+JNIEXPORT void JNICALL N(roomAudioRouteChanged)(JNIEnv*,jclass,jlong h){
+    if(h)host(h)->game.refresh_room_audio_output();
+}
 JNIEXPORT jboolean JNICALL N(roomReady)(JNIEnv*,jclass,jlong h){return h && host(h)->game.room_ready();}
 JNIEXPORT jboolean JNICALL N(entryVisible)(JNIEnv*,jclass,jlong h){return h && host(h)->game.entry_visible();}
 JNIEXPORT jboolean JNICALL N(inRoom)(JNIEnv*,jclass,jlong h){return h && host(h)->game.in_room();}

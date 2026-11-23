@@ -8,6 +8,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <dbt.h>
 #include <windowsx.h>
 #include <shellapi.h>
 #include <algorithm>
@@ -472,6 +473,13 @@ LRESULT CALLBACK player_window(HWND window, UINT event, WPARAM w, LPARAM l) {
             p->connection.set_active(p->app_active && !IsIconic(window));
             if(p->online)p->online->next_poll={};
             if(!p->app_active)suspend_room(*p);
+            break;
+        case WM_DEVICECHANGE:
+            if (p->online && (w == DBT_DEVNODES_CHANGED || w == DBT_DEVICEARRIVAL ||
+                              w == DBT_DEVICEREMOVECOMPLETE)) {
+                p->online->audio.output_changed();
+                p->online->next_poll = {};
+            }
             break;
         case WM_SIZE:
             layout_course(*p);

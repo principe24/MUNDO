@@ -108,6 +108,11 @@ public:
         retry_at_ = {};
     }
 
+    // The scene and mixer remain valid when the operating system changes the
+    // physical output. Retire only the platform device so the next game frame
+    // opens the new route without replaying or re-downloading scene audio.
+    void output_changed() { suspend(); }
+
 private:
     using Clock = std::chrono::steady_clock;
     audio::Mixer mixer_{audio_sample_rate};

@@ -29,12 +29,17 @@ public:
             AudioQueueBufferRef buffer = nullptr;
             if (AudioQueueAllocateBuffer(queue_, 512 * format.mBytesPerFrame, &buffer) != noErr) return false;
             refill(this, queue_, buffer);
-            if (!healthy()) return false;
+            if (failed_.load(std::memory_order_relaxed)) return false;
         }
         return AudioQueueStart(queue_, nullptr) == noErr;
     }
 
-    bool healthy() const noexcept override { return !failed_.load(std::memory_order_relaxed); }
+    bool healthy() const noexcept override {
+        if (failed_.load(std::memory_order_relaxed) || !queue_) return false;
+        UInt32 running = 0;
+        UInt32 size = sizeof(running);
+        return AudioQueueGetProperty(queue_, kAudioQueueProperty_IsRunning, &running, &size) == noErr && running;
+    }
 
 private:
     void* owner_;

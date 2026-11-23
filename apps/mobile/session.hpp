@@ -45,6 +45,9 @@ public:
         room_audio_allowed_ = allowed;
         if (!allowed && room_) room_->audio.suspend();
     }
+    void refresh_room_audio_output() {
+        if (room_) room_->audio.output_changed();
+    }
     bool room_wants_audio() const {
         const auto levels = room_levels();
         return room_ready() && !levels.muted && levels.volume && room_->audio.has_sources();

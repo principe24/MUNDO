@@ -57,7 +57,7 @@
     UILabel *_roomState,*_carGuide,*_course;
     CFTimeInterval _nextCarGuide;
     unsigned _roomRevision;
-    BOOL _showingRoom,_showingFrame,_showingEntry,_viewInFront;
+    BOOL _showingRoom,_showingFrame,_showingEntry,_viewInFront,_audioInterrupted;
     UILabel *_lobby;
     DrivePedal *_pedal;
     UILabel *_speed;
@@ -223,6 +223,7 @@
     NSNotificationCenter *n=NSNotificationCenter.defaultCenter;
     [n addObserver:self selector:@selector(soundInterrupted:) name:AVAudioSessionInterruptionNotification object:sound];
     [n addObserver:self selector:@selector(soundServicesReset:) name:AVAudioSessionMediaServicesWereResetNotification object:sound];
+    [n addObserver:self selector:@selector(soundRouteChanged:) name:AVAudioSessionRouteChangeNotification object:sound];
     [n addObserver:self selector:@selector(willResignActive:) name:UIApplicationWillResignActiveNotification object:nil];
     [n addObserver:self selector:@selector(didBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
     _game.set_room_active(false);
@@ -244,6 +245,7 @@
     const auto type=[notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
     const auto options=[notification.userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue];
     dispatch_async(dispatch_get_main_queue(), ^{
+        self->_audioInterrupted = type==AVAudioSessionInterruptionTypeBegan;
         const bool mayResume = type==AVAudioSessionInterruptionTypeEnded && (options & AVAudioSessionInterruptionOptionShouldResume);
         self->_game.set_room_audio_allowed(mayResume);
     });
@@ -253,6 +255,13 @@
         self->_game.set_room_audio_allowed(false);
         [AVAudioSession.sharedInstance setCategory:AVAudioSessionCategoryAmbient error:nil];
         self->_game.set_room_audio_allowed(true);
+    });
+}
+- (void)soundRouteChanged:(NSNotification*)notification {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self->_game.refresh_room_audio_output();
+        self->_game.set_room_audio_allowed(!self->_audioInterrupted && self->_viewInFront &&
+            UIApplication.sharedApplication.applicationState==UIApplicationStateActive);
     });
 }
 - (void)didBecomeActive:(NSNotification*)notification {

@@ -22,7 +22,11 @@ final class RoomAudioFocus {
     }
 
     void update(boolean wanted) {
-        if (manager == null || wanted == (request != null)) return;
+        if (manager == null) {
+            allowPlayback.accept(false);
+            return;
+        }
+        if (wanted == (request != null)) return;
         final long ticket = ++generation;
         if (!wanted) {
             allowPlayback.accept(false);
@@ -43,5 +47,15 @@ final class RoomAudioFocus {
                 }, main).build();
         boolean granted = manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
         allowPlayback.accept(granted);
+    }
+
+    void restart(boolean wanted) {
+        ++generation;
+        allowPlayback.accept(false);
+        if (manager == null) return;
+        AudioFocusRequest old = request;
+        request = null;
+        if (old != null) manager.abandonAudioFocusRequest(old);
+        if (wanted) update(true);
     }
 }

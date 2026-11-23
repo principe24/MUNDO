@@ -29,7 +29,11 @@ public:
             AAudioStream_getChannelCount(stream_) == 2 && AAudioStream_getSampleRate(stream_) == audio_sample_rate &&
             AAudioStream_requestStart(stream_) == AAUDIO_OK;
     }
-    bool healthy() const noexcept override { return !failed_.load(std::memory_order_relaxed); }
+    bool healthy() const noexcept override {
+        if (failed_.load(std::memory_order_relaxed) || !stream_) return false;
+        const auto state = AAudioStream_getState(stream_);
+        return state == AAUDIO_STREAM_STATE_STARTING || state == AAUDIO_STREAM_STATE_STARTED;
+    }
 
 private:
     void* owner_;

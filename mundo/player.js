@@ -663,7 +663,7 @@
         if(driving)driving=car;
         roomCar=next;
       }
-      audio?.install(admission.world);
+      audio?.install(admission.world,true);
       cars=available;changeRoomTerrain(geometry,terrain);
     }
     function clearRoom(){
@@ -846,7 +846,7 @@
           const rolledBack=!online && link.project && link.route?.phase===2;
           snapAfterReturn=false;
           lastSnapshot=performance.now();online=true;displayCourse(snap.course);
-          audio?.setActive(!document.hidden);roomClips?.update();
+          roomClips?.update();audio?.setActive(!document.hidden);
           roomModels.update();
           if(ownerPeople)link.roomActor(ownerPeople);
           if(vehicleLook)link.roomBruma(vehicleLook,MundoBrumaLook.isBruma(roomCar?.car));

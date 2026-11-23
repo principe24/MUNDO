@@ -700,7 +700,7 @@ window.MundoRoomLink=class {
     this.brumaOffered=Boolean(this.lease) && response.headers.get("x-mundo-car-art")==="bruma-1";
     if(!this.brumaOffered)this.clearRoomBruma();
     this.modelsOffered=Boolean(this.lease) && !project && response.headers.get("x-mundo-creator-models")==="mesh-1";
-    this.audioClipsOffered=Boolean(this.lease) && !project && response.headers.get("x-mundo-audio-clips")==="wav-1";
+    this.audioClipsOffered=Boolean(this.lease) && response.headers.get("x-mundo-audio-clips")==="wav-1";
     this.project=project;
     if(project){this.waiting=true;return this.scene;}
     if(this.revision!==data.revision){

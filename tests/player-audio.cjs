@@ -147,3 +147,55 @@ test("late or altered clip deliveries never reach a new room, failure leaves oth
   assert.deepEqual(installed,[]);assert.ok(energy(contexts[0])>1);
   room.clear();player.clear();
 });
+
+test("a one-shot keeps its cursor across sectors and re-arms when a different world reuses its ID",async()=>{
+  const {host,contexts,ticks}=device(),player=Player.create(host,false);
+  const clip=await Clips.prepare(Clips.encodeMono(new Float32Array(240).fill(.5)));
+  const authored={nodes:new Map(),next:1n};
+  Scene.add(authored,{label:"Campana",preset:clip.key,position:[0,0,0],radius:10,volume:1,loop:false});
+  player.install(authored);player.setClip(clip.key,await Clips.verify(clip.key,clip.bytes));
+  player.setActive(true);await player.activate();const ctx=contexts[0];
+  const levels=()=>ctx.nodes.filter(n=>!n.stopped && n.onended).map(n=>
+    n.buffer.getChannelData(0).some(sample=>Math.abs(sample)>.01));
+  assert.ok(levels().includes(true));
+  for(const n of ctx.nodes){n.onended?.();n.onended=null;}
+  ctx.currentTime+=.25;for(const tick of ticks)tick();
+  player.install(authored,true);assert.ok(!levels().includes(true));
+  player.setActive(false);player.install(authored);player.setActive(true);assert.ok(levels().includes(true));
+  player.clear();
+});
+
+test("only a project's confirmed route may receive a clip and a new world discards old PCM",async()=>{
+  const first=await Clips.prepare(Clips.encodeMono(new Float32Array(240).fill(.1)));
+  const second=await Clips.prepare(Clips.encodeMono(new Float32Array(240).fill(.3)));
+  const a={revision:"a".repeat(64),epoch:1,world:10,phase:0};
+  const b={revision:"b".repeat(64),epoch:2,world:20,phase:0};
+  let requested=[],installed=[],key=first.key,release;
+  const store=new Map([[first.key,first],[second.key,second]]);
+  const link={project:true,revision:null,audioClipsOffered:false,lease:"f".repeat(32),
+    route:a,scene:{route:a},waiting:false,
+    async call(endpoint,body){
+      requested.push(body);await new Promise(done=>{release=done;});
+      const item=store.get(body.key);
+      return new Response(item.bytes,{headers:{"content-type":"audio/wav","x-mundo-audio-digest":item.digest}});
+    }
+  };
+  const audio={get clipKeys(){return [key];},clearClips(){installed=[];},setClip(id){installed.push(id);}};
+  const room=Player.roomClips(link,audio,Clips,async res=>new Uint8Array(await res.arrayBuffer()),()=>{});
+  room.update();assert.deepEqual(requested,[]); // legacy project
+  link.audioClipsOffered=true;const firstTransfer=room.update();release();await firstTransfer;
+  assert.deepEqual(installed,[first.key]);
+  link.waiting=true;link.staged={route:b};room.update();
+  assert.deepEqual(installed,[]);assert.equal(requested.length,1);
+  link.waiting=false;link.route=b;key=second.key;
+  room.update();assert.equal(requested.length,1); // installation still describes A
+  link.scene={route:b};const abandoned=room.update();
+  link.waiting=true;release();await abandoned;assert.deepEqual(installed,[]);
+  link.waiting=false;const accepted=room.update();release();await accepted;
+  assert.deepEqual(installed,[second.key]);
+  assert.deepEqual(requested.map(r=>[r.revision,r.key]),[
+    [a.revision,first.key],[b.revision,second.key],[b.revision,second.key]
+  ]);
+  assert.deepEqual(Object.keys(requested[2]).sort(),["key","lease","revision"]);
+  room.clear();
+});

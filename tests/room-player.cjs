@@ -7,7 +7,7 @@ async function until(fn){
   const start=Date.now();
   while(!fn()){if(Date.now()-start>7000)throw Error("Timed out waiting for room state");await new Promise(r=>setTimeout(r,20));}
 }
-async function player(origin,seat,title="Escena de prueba"){
+async function player(origin,seat,title="Escena de prueba",environment={}){
   const elements=new Map(),handlers={},storage=new Map();let view,connected=true;
   const get=id=>{
     if(!elements.has(id))elements.set(id,{textContent:"",hidden:false,parentElement:{classList:{add(){},remove(){}}},focus(){},setAttribute() {},addEventListener(){}});
@@ -17,7 +17,7 @@ async function player(origin,seat,title="Escena de prueba"){
     location:new URL(origin+"/mundo/MUNDO.html#seat="+seat.invite),
     TextEncoder,TextDecoder,Uint8Array,atob,URLSearchParams,Uint8ClampedArray,
     AbortController,Blob,URL,console,
-    setTimeout,clearTimeout,AbortSignal,crypto,performance,
+    setTimeout,clearTimeout,setInterval,clearInterval,AbortSignal,crypto,performance,...environment,
     fetch:(url,o)=>connected?fetch(origin+url,{...o,headers:{...o.headers,origin}}):Promise.reject(new TypeError("offline")),
     document:{body:{dataset:{}},getElementById:get,addEventListener(){},hasFocus:()=>true,hidden:false},
     navigator:{maxTouchPoints:0},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},
@@ -83,4 +83,56 @@ test("hosted MUNDO player shows the courtyard NPC walking, hides stale poses and
   await until(()=>guest.view.npcPositions.length===1 && guest.get("notice").textContent.includes("esperando"));
   assert.ok(guest.view.actorParts.filter(part=>part.actorRig.npc).length>1);
   assert.equal(guest.get("world").textContent,"Patio del muro");
+});
+
+test("production player mixes a sealed WAV over real HTTP, silences a lost seat and resumes the mix",async t=>{
+  const {MundoWorld}=require("../server/room-runtime.cjs");
+  const {roomFromSource}=require("../server/room.cjs"),{readRoomSource}=require("../server/room-source.cjs");
+  const Scene=require("../web/audio-scene.js"),Clips=require("../web/audio-clips.js"),File=require("../web/room-file.js");
+  const world=MundoWorld.decode(fs.readFileSync(path.join(__dirname,"../examples/Plaza_Brisa.mworld")));
+  const samples=Float32Array.from({length:2400},(_,i)=>.5*Math.sin(i/10));
+  const clip=await Clips.prepare(Clips.encodeMono(samples));
+  Scene.add(world,{label:"Emisora",preset:clip.key,spatial:"2d",group:"musica",position:[0,0,0],volume:1,radius:1});
+  const bytes=MundoWorld.encode(world),title="Emisora privada";
+  const base=File.pack({title,revision:1,hash:await File.digest(bytes)},bytes);
+  const sealed=await Clips.pack(base,[clip]);
+  const room=await roomFromSource(readRoomSource("Emisora.mroomaudio",Buffer.from(sealed)));
+  const host=createHost(room,{port:0}),origin=await host.start();
+  let guest,device,fetches=0;
+  const pending=new Set();
+  host.server.on("request", req=>{if(req.url==="/room/audio")fetches++;});
+  class AudioContext {
+    constructor(){device=this;this.sampleRate=24000;this.state="suspended";this.destination={};}
+    get currentTime(){return performance.now()/1000;}
+    resume(){this.state="running";return Promise.resolve();}
+    close(){this.state="closed";return Promise.resolve();}
+    createGain(){return {gain:{value:1},connect(){},disconnect(){}};}
+    createBuffer(_,frames){
+      const channels=[new Float32Array(frames),new Float32Array(frames)];
+      return {getChannelData:i=>channels[i],duration:frames/this.sampleRate};
+    }
+    createBufferSource(){
+      const clock=this;
+      return {connect(){},disconnect(){},stop(){clearTimeout(this.timer);pending.delete(this);},
+        start(at){
+          pending.add(this);
+          this.timer=setTimeout(()=>{pending.delete(this);this.onended?.();},
+            Math.max(0,(at+this.buffer.duration-clock.currentTime)*1000));
+        }};
+    }
+  }
+  const energy=()=>[...pending].some(node=>node.buffer.getChannelData(0).some(sample=>Math.abs(sample)>.05));
+  t.after(async()=>{try{if(guest)await guest.stop();}finally{await host.close();}});
+  guest=await player(origin,room.seats[0],room.name,{AudioContext,Float32Array});
+  assert.equal(device,undefined);
+  await guest.get("audioEnable").onclick();
+  await until(()=>fetches>0 && energy());
+  assert.equal(guest.get("audioStatus").textContent,"Salida de audio activa.");
+  guest.setConnected(false);
+  await until(()=>guest.get("notice").textContent.includes("Reconectando") && !energy());
+  guest.setConnected(true);
+  await until(()=>guest.get("notice").textContent.includes("esperando") && energy());
+  assert.equal(fetches,1,"the verified clip survives a transient disconnect for the same lease");
+  await guest.get("roomAction").onclick();
+  await until(()=>device.state==="closed" && !energy());
 });

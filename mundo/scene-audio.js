@@ -62,8 +62,11 @@ globalThis.MundoPlayerAudio = (() => {
         try { host.localStorage.setItem(key, JSON.stringify(settings)); return true; }
         catch { return false; }
       },
-      install(world) {
+      install(world, sameRevision = false) {
         const next = host.MundoAudioScene.read(world);
+        // IDs are local to a world. A one-shot or voice with ID 1 in a new
+        // publication must not inherit the previous world's playback cursor.
+        if (!sameRevision) output?.setSources([]);
         sources = next;
         output?.setSources(next);
       },
@@ -95,13 +98,26 @@ globalThis.MundoPlayerAudio = (() => {
     function clear() {
       pause(); scope = null; failures.clear(); loaded.clear(); audio.clearClips(); status("");
     }
+    function admitted() {
+      if (!link.audioClipsOffered || !link.lease) return null;
+      if (!link.project) return link.revision ? {revision:link.revision,lease:link.lease} : null;
+      const route = link.route, scene = link.scene?.route;
+      if (link.waiting || !route || route.phase === 1 || !scene || route.world !== scene.world ||
+          route.revision !== scene.revision || route.epoch !== scene.epoch) return null;
+      return {revision:route.revision, lease:link.lease, epoch:route.epoch, world:route.world};
+    }
+    function same(a,b) {
+      return a && b && a.lease === b.lease && a.revision === b.revision &&
+        a.world === b.world && a.epoch === b.epoch;
+    }
     function update() {
-      if (!link.audioClipsOffered || !link.lease || !link.revision || link.project) {
+      const next = admitted();
+      if (!next) {
         if (scope) clear();
         return;
       }
-      if (link.lease !== scope?.lease || link.revision !== scope?.revision) {
-        clear(); scope = {lease: link.lease, revision: link.revision};
+      if (!same(next,scope)) {
+        clear(); scope = next;
       }
       if (flight) return;
       const wanted = audio.clipKeys;
@@ -110,11 +126,10 @@ globalThis.MundoPlayerAudio = (() => {
       const key = wanted.find(key => !loaded.has(key) && (failures.get(key)?.after ?? 0) <= clock());
       if (!key) return;
       const ticket = scope, controller = flight = new AbortController();
-      const current = () => flight === controller && scope === ticket && link.audioClipsOffered &&
-        link.lease === ticket.lease && link.revision === ticket.revision;
+      const current = () => flight === controller && scope === ticket && same(admitted(),ticket);
       const timeout = setTimeout(() => controller.abort(), 15000);
       async function download() {
-        const response = await link.call("audio", {...ticket,key}, null, controller.signal, true);
+        const response = await link.call("audio", {lease:ticket.lease,revision:ticket.revision,key}, null, controller.signal, true);
         const digest = response.headers.get("x-mundo-audio-digest");
         if (!digest || !/^[a-f0-9]{64}$/.test(digest) || key !== "s" + digest.slice(0,16))
           throw Object.assign(Error("Identidad del sonido inválida."), {status:422});

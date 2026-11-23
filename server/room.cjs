@@ -360,7 +360,8 @@ function makeSession(single,project,store,now=()=>performance.now()){
     const car=vehicle && {x:vehicle.x,z:vehicle.z,yaw:vehicle.yaw,
       driver:vehicle.driver===null?null:vehicle.driver+1,passenger:vehicle.passenger===null?null:vehicle.passenger+1};
     return {world:current.def.name,epoch:travel?.epoch??0,meeting:meeting?{x:meeting[0],z:meeting[2]}:null,
-      seats:players,car,gates,passed:current.course?.passed??0};
+      seats:players,car,gates,passed:current.course?.passed??0,
+      ...(current.npcs?{npcs:current.npcs.inspect()}: {})};
   }
   // Only the process holding this room reference has the moderation functions.
   const moderation={

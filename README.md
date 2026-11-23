@@ -1,10 +1,16 @@
 # Mundo Engie
 
-**Versión privada 0.60.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
+**Versión privada 0.61.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
 
 Mundo Engie es el motor de MUNDO Studio, la aplicación de creación, y de MUNDO, la plataforma donde la gente entra a jugar las experiencias en línea. Los creadores pueden diseñar mapas de géneros y estilos distintos. El formato `.mworld` guarda sus escenas. Las casas, los vehículos y los objetos pueden utilizar modelos tridimensionales con superficies y materiales propios. El detalle gráfico se ajusta por dispositivo.
 
 **Meta del propietario.** Desarrollar un motor propio de propósito general con un alcance comparable a Unreal. MUNDO y MUNDO Studio son las primeras aplicaciones del motor.
+
+## Música distinta por mundo de un proyecto · 0.61.0
+
+Studio exporta `.mprojectmusic` con las grabaciones cortas y hasta ocho pistas largas referenciadas por sus mundos. El anfitrión verifica todo el contenedor. MUNDO cambia de pista únicamente después de confirmar un portal y entrega a cada jugador los segmentos de la revisión activa.
+
+[Formato, límites y experiencia reproducible](docs/AUDIO_061.md) · [Proyecto de los dos patios](examples/audio/Ruta_musical_de_los_patios.mprojectmusic)
 
 ## Música larga de Studio a una sala privada · 0.60.0
 

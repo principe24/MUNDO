@@ -6,6 +6,12 @@ Mundo Engie es el motor de MUNDO Studio, la aplicación de creación, y de MUNDO
 
 **Meta del propietario.** Desarrollar un motor propio de propósito general con un alcance comparable a Unreal. MUNDO y MUNDO Studio son las primeras aplicaciones del motor.
 
+## Audio de Studio a la partida · 0.57.0
+
+La **Plaza del carillón** es una sala privada para dos jugadores. Lleva viento en 2D, agua y maquinaria en 3D, y una campana original importada como WAV. Studio permite colocar fuentes, escuchar la mezcla desde la cámara y publicar los sonidos seleccionados de una sala o de un proyecto con portales.
+
+[Usar el panel de audio y abrir la plaza](docs/AUDIO_057.md) · [Descargar la sala de ejemplo](examples/audio/Plaza_del_carillon.mroomaudio)
+
 ## Navegación y personajes de sala · 0.56.0
 
 En Studio, abre **Personajes y rutas a pie** para colocar puntos sobre el suelo, ordenar las paradas, asignar la ruta a un personaje y comprobar el recorrido. El guía de **Los dos patios** rodea un muro y hace una pausa. Al cruzar al jardín, el segundo guía acompaña a un visitante.

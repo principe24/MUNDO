@@ -2,6 +2,72 @@
   "formato": "MundoIA-areas-1",
   "areas": [
     {
+      "key": "audio",
+      "title": "Audio",
+      "tasks": [
+        {
+          "key": "audio-01",
+          "title": "Mezclar una fuente de ambiente por distancia",
+          "goal": "Añade al reproductor web un ambiente sintetizado original de nivel regulable y atenuación por distancia a una fuente de escena. Activa el audio después de una interacción del jugador y libera el grafo al abandonar la sala. Al reingresar crea una sola instancia de audio.",
+          "paths": [
+            "mundo/scene-audio.js",
+            "mundo/player.js",
+            "mundo/MUNDO.html"
+          ],
+          "context": [
+            "mundo/room.js",
+            "mundo/walk.js"
+          ]
+        },
+        {
+          "key": "audio-02",
+          "title": "Colocar y publicar la fuente sonora desde Studio",
+          "goal": "Añade una fuente opcional de ambiente al editor con posición, radio y volumen. Conserva y valida sus datos en la revisión. Usa el mismo esquema para que el reproductor en línea mueva la fuente al lugar indicado por el creador.",
+          "paths": [
+            "studio/editor.js",
+            "studio/Mundo_Studio.html",
+            "web/room-file.js",
+            "studio/publications.js",
+            "mundo/scene-audio.js"
+          ],
+          "context": [
+            "web/project.js",
+            "mundo/player.js"
+          ]
+        },
+        {
+          "key": "audio-03",
+          "title": "Reproducir música larga por segmentos",
+          "goal": "Añade una vía explícita para pistas musicales que superen los dieciséis segundos del importador de efectos. Acota memoria y cola de decodificación, conserva la reproducción de los archivos anteriores, pausa y cancela al abandonar o cambiar de revisión. Verifica continuidad de muestras, consumo acotado y descarga únicamente de los segmentos autorizados.",
+          "paths": [
+            "web/audio-clips.js",
+            "web/audio-dsp.js",
+            "mundo/scene-audio.js",
+            "src/audio.cpp"
+          ],
+          "context": [
+            "docs/AUDIO_057.md",
+            "server/room.cjs"
+          ]
+        },
+        {
+          "key": "audio-04",
+          "title": "Conservar la mezcla tras un cambio de dispositivo de audio",
+          "goal": "Verifica la salida de los reproductores nativos con altavoz y auriculares, y el retorno del audio tras pérdida de foco, suspensión, cambio de ruta de salida y reconexión. Si una plataforma carece de equipo de prueba, anota aparte compilación, simulación y escucha pendiente. Mantén los niveles guardados por perfil.",
+          "paths": [
+            "apps/windows/audio_device.cpp",
+            "apps/android/audio_device.cpp",
+            "apps/ios/audio_device.cpp",
+            "apps/room/playback_audio.hpp"
+          ],
+          "context": [
+            "docs/AUDIO_057.md",
+            "include/mundo/audio.hpp"
+          ]
+        }
+      ]
+    },
+    {
       "key": "navegacion",
       "title": "Navegación e IA de personajes",
       "tasks": [
@@ -457,42 +523,6 @@
             "include/mundo/room_view.hpp",
             "include/mundo/appearance.hpp",
             "docs/MODELOS_DE_CREADOR_052.md"
-          ]
-        }
-      ]
-    },
-    {
-      "key": "audio",
-      "title": "Audio",
-      "tasks": [
-        {
-          "key": "audio-01",
-          "title": "Mezclar una fuente de ambiente por distancia",
-          "goal": "Añade al reproductor web un ambiente sintetizado original de nivel regulable y atenuación por distancia a una fuente de escena. Activa el audio después de una interacción del jugador y libera el grafo al abandonar la sala. Al reingresar crea una sola instancia de audio.",
-          "paths": [
-            "mundo/scene-audio.js",
-            "mundo/player.js",
-            "mundo/MUNDO.html"
-          ],
-          "context": [
-            "mundo/room.js",
-            "mundo/walk.js"
-          ]
-        },
-        {
-          "key": "audio-02",
-          "title": "Colocar y publicar la fuente sonora desde Studio",
-          "goal": "Añade una fuente opcional de ambiente al editor con posición, radio y volumen. Conserva y valida sus datos en la revisión. Usa el mismo esquema para que el reproductor en línea mueva la fuente al lugar indicado por el creador.",
-          "paths": [
-            "studio/editor.js",
-            "studio/Mundo_Studio.html",
-            "web/room-file.js",
-            "studio/publications.js",
-            "mundo/scene-audio.js"
-          ],
-          "context": [
-            "web/project.js",
-            "mundo/player.js"
           ]
         }
       ]

@@ -1,0 +1,40 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs/promises"), path = require("node:path");
+const {createPlaza} = require("../examples/audio/crear-plaza.cjs");
+const {MundoWorld, MundoGeometry, MundoMeeting} = require("../server/room-runtime.cjs");
+const Scene = require("../web/audio-scene.js");
+const Clips = require("../web/audio-clips.js");
+const DSP = require("../web/audio-dsp.js");
+const Room = require("../web/room-file.js");
+
+test("la plaza privada abre con dos plazas de llegada y la campana suena al acercarse", async () => {
+  const saved = await fs.readFile(path.join(__dirname,"../examples/audio/Plaza_del_carillon.mroomaudio"));
+  assert.ok(saved.equals(Buffer.from(await createPlaza())),"La sala de ejemplo debe reproducirse byte por byte");
+  const bank = Clips.unpack(saved), info = await Room.verify(bank.room);
+  const world = MundoWorld.decode(info.world), sources = Scene.read(world);
+  assert.equal(info.title,"Plaza del carillón");
+  const arrivals = MundoMeeting.preview(MundoGeometry.flatten(world),null,info.meetingPoint);
+  assert.equal(arrivals.length,2);
+  assert.equal(sources.length,4);
+  Clips.match(sources,bank.items);
+  const [bell] = bank.items;
+  const sample = await Clips.verify(bell.key,bell.bytes,bell.digest);
+  const mixer = DSP.create(48000);
+  mixer.setClip(bell.key,sample);
+  mixer.setSources(sources);
+  mixer.setGroupVolume("ambiente",0);
+  mixer.setGroupVolume("efectos",0);
+  const l = new Float32Array(4096), r = new Float32Array(4096);
+  mixer.setListener(info.meetingPoint,0);
+  mixer.render(l,r);
+  assert.ok(l.every(n => n === 0) && r.every(n => n === 0));
+  mixer.setListener([0,1.6,-6.2],0);
+  mixer.render(l,r);
+  assert.ok(l.some(n => Math.abs(n) > .05));
+  assert.deepEqual(l,r);
+  for (let i=0; i<28; ++i) mixer.render(l,r);
+  assert.ok(l.every(n => n === 0));
+});

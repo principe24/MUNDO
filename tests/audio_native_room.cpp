@@ -1,6 +1,7 @@
 // Linux test adapter: the production native room client talks to the production
 // host on loopback. Only HTTP transport and the physical audio device are substituted.
 #include "audio_transfer.hpp"
+#include "playback_audio.hpp"
 #include "mundo/document_digest.hpp"
 #include <array>
 #include <atomic>
@@ -15,6 +16,13 @@ using namespace std::chrono_literals;
 enum class Mode { normal, corrupt, legacy, project };
 Mode mode{};
 std::atomic<unsigned> clip_calls{}, info_calls{};
+room::RenderAudio render_pcm{};
+void* render_owner{};
+
+struct Capture final : room::AudioDevice {
+    ~Capture() override { render_pcm=nullptr; render_owner=nullptr; }
+    bool healthy() const noexcept override { return true; }
+};
 
 struct Transfer {
     room::Response reply;
@@ -37,9 +45,12 @@ int run() {
     if (!invitation || invitation->host != L"127.0.0.1" || invitation->tls) return 1;
     room::Client client;
     if (!client.start(wide)) return 2;
-    audio::Mixer mixer;
-    mixer.set_group_volume(audio::Group::ambiente, 0);
-    mixer.set_group_volume(audio::Group::efectos, 0);
+    room::PlaybackAudio playback;
+    AudioLevels levels;
+    levels.volume = 100;
+    levels.groups[static_cast<unsigned>(audio::Group::ambiente)] = 0;
+    levels.groups[static_cast<unsigned>(audio::Group::efectos)] = 0;
+    playback.set_levels(levels);
     bool world = false;
     unsigned after_download = 0;
     bool first_room_heard = false;
@@ -49,19 +60,19 @@ int run() {
         auto update = client.poll();
         if (update.phase == room::Phase::ended) {std::cerr << update.message << '\n'; return 3;}
         if (update.world) {
-            mixer.reset();
-            world = mixer.set_world(*update.world) && room::required_clips(*update.world).size() == 1;
+            playback.install(*update.world,true);
+            world = playback.has_sources() && room::required_clips(*update.world).size() == 1;
             if (!world) return 4;
-            mixer.set_listener({0,1.6,-6.2}, 0);
         }
-        if (update.region) mixer.set_world(update.region->world);
+        if (update.region) playback.install(update.region->world,false);
+        if (world && update.phase==room::Phase::playing) playback.frame({0,1.6,-6.2},0);
+        else playback.suspend();
         if (update.world || update.region) update.confirm_install();
         for(const auto& clip : update.audio_clips) {
-            const auto data = std::span(reinterpret_cast<const std::uint8_t*>(clip.bytes.data()), clip.bytes.size());
-            auto sample = audio::decode_clip(clip.key, data);
-            if (!world || !sample || !mixer.set_clip(clip.key, sample) || (mode != Mode::normal && mode != Mode::project)) return 5;
+            if (!world || !render_pcm || !playback.install_clip(clip.key,clip.bytes) ||
+                (mode != Mode::normal && mode != Mode::project)) return 5;
             std::array<float,8192> out{};
-            mixer.render(out);
+            render_pcm(render_owner,out);
             if (!std::any_of(out.begin(),out.end(),[](float v){return std::abs(v) > .05f;})) return 6;
             if (mode == Mode::project) {
                 const bool destination = update.title == "Biblioteca";
@@ -81,7 +92,7 @@ int run() {
             ++after_download;
             if (after_download >= 10 && (mode == Mode::corrupt || mode == Mode::legacy)) {
                 std::array<float,512> out{};
-                mixer.render(out);
+                render_pcm(render_owner,out);
                 if (std::any_of(out.begin(),out.end(),[](float v){return v != 0;})) return 7;
                 client.leave();
                 return 0;
@@ -94,6 +105,10 @@ int run() {
 }
 }
 namespace mundo::room {
+std::unique_ptr<AudioDevice> open_audio_device(void* owner,RenderAudio render) {
+    render_pcm=render;render_owner=owner;
+    return std::make_unique<Capture>();
+}
 bool matches_digest(std::span<const std::byte> bytes,std::string_view hex) {
     return matches_document_digest(bytes,hex);
 }

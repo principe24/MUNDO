@@ -85,22 +85,8 @@ test("hosted MUNDO player shows the courtyard NPC walking, hides stale poses and
   assert.equal(guest.get("world").textContent,"Patio del muro");
 });
 
-test("production player mixes a sealed WAV over real HTTP, silences a lost seat and resumes the mix",async t=>{
-  const {MundoWorld}=require("../server/room-runtime.cjs");
-  const {roomFromSource}=require("../server/room.cjs"),{readRoomSource}=require("../server/room-source.cjs");
-  const Scene=require("../web/audio-scene.js"),Clips=require("../web/audio-clips.js"),File=require("../web/room-file.js");
-  const world=MundoWorld.decode(fs.readFileSync(path.join(__dirname,"../examples/Plaza_Brisa.mworld")));
-  const samples=Float32Array.from({length:2400},(_,i)=>.5*Math.sin(i/10));
-  const clip=await Clips.prepare(Clips.encodeMono(samples));
-  Scene.add(world,{label:"Emisora",preset:clip.key,spatial:"2d",group:"musica",position:[0,0,0],volume:1,radius:1});
-  const bytes=MundoWorld.encode(world),title="Emisora privada";
-  const base=File.pack({title,revision:1,hash:await File.digest(bytes)},bytes);
-  const sealed=await Clips.pack(base,[clip]);
-  const room=await roomFromSource(readRoomSource("Emisora.mroomaudio",Buffer.from(sealed)));
-  const host=createHost(room,{port:0}),origin=await host.start();
-  let guest,device,fetches=0;
-  const pending=new Set();
-  host.server.on("request", req=>{if(req.url==="/room/audio")fetches++;});
+function outputCapture(){
+  const pending=new Set(); let device;
   class AudioContext {
     constructor(){device=this;this.sampleRate=24000;this.state="suspended";this.destination={};}
     get currentTime(){return performance.now()/1000;}
@@ -121,10 +107,30 @@ test("production player mixes a sealed WAV over real HTTP, silences a lost seat 
         }};
     }
   }
-  const energy=()=>[...pending].some(node=>node.buffer.getChannelData(0).some(sample=>Math.abs(sample)>.05));
+  const signal=(polarity=0)=>[...pending].some(node=>node.buffer.getChannelData(0)
+    .some(sample=>(polarity?sample*polarity:Math.abs(sample))>.05));
+  return {AudioContext,signal,get device(){return device;}};
+}
+
+test("production player mixes a sealed WAV over real HTTP, silences a lost seat and resumes the mix",async t=>{
+  const {MundoWorld}=require("../server/room-runtime.cjs");
+  const {roomFromSource}=require("../server/room.cjs"),{readRoomSource}=require("../server/room-source.cjs");
+  const Scene=require("../web/audio-scene.js"),Clips=require("../web/audio-clips.js"),File=require("../web/room-file.js");
+  const world=MundoWorld.decode(fs.readFileSync(path.join(__dirname,"../examples/Plaza_Brisa.mworld")));
+  const samples=Float32Array.from({length:2400},(_,i)=>.5*Math.sin(i/10));
+  const clip=await Clips.prepare(Clips.encodeMono(samples));
+  Scene.add(world,{label:"Emisora",preset:clip.key,spatial:"2d",group:"musica",position:[0,0,0],volume:1,radius:1});
+  const bytes=MundoWorld.encode(world),title="Emisora privada";
+  const base=File.pack({title,revision:1,hash:await File.digest(bytes)},bytes);
+  const sealed=await Clips.pack(base,[clip]);
+  const room=await roomFromSource(readRoomSource("Emisora.mroomaudio",Buffer.from(sealed)));
+  const host=createHost(room,{port:0}),origin=await host.start();
+  let guest,fetches=0;
+  host.server.on("request", req=>{if(req.url==="/room/audio")fetches++;});
+  const capture = outputCapture(), {AudioContext,signal:energy} = capture;
   t.after(async()=>{try{if(guest)await guest.stop();}finally{await host.close();}});
   guest=await player(origin,room.seats[0],room.name,{AudioContext,Float32Array});
-  assert.equal(device,undefined);
+  assert.equal(capture.device,undefined);
   await guest.get("audioEnable").onclick();
   await until(()=>fetches>0 && energy());
   assert.equal(guest.get("audioStatus").textContent,"Salida de audio activa.");
@@ -134,5 +140,46 @@ test("production player mixes a sealed WAV over real HTTP, silences a lost seat 
   await until(()=>guest.get("notice").textContent.includes("esperando") && energy());
   assert.equal(fetches,1,"the verified clip survives a transient disconnect for the same lease");
   await guest.get("roomAction").onclick();
-  await until(()=>device.state==="closed" && !energy());
+  await until(()=>capture.device.state==="closed" && !energy());
+});
+
+test("walking through a published portal switches the real client to the second world's WAV",async t=>{
+  const {MundoWorld,MundoProject}=require("../server/room-runtime.cjs");
+  const Clips=require("../web/audio-clips.js"),Project=require("../web/audio-project.js");
+  const Scene=require("../web/audio-scene.js"),{roomFromSource}=require("../server/room.cjs");
+  const {readRoomSource}=require("../server/room-source.cjs");
+  const clips=[],worlds=[],portals=[];
+  for(const id of [1,2]){
+    // Opposite signs distinguish the two recordings exactly after clipping and panning.
+    const clip=await Clips.prepare(Clips.encodeMono(new Float32Array(1200).fill(id===1?.3:-.4)));
+    const world=MundoWorld.empty(),floor=MundoWorld.add(world,"Plaza",1);
+    floor.p=[0,-.25,0];floor.s=[24,.5,24];
+    if(id===1){
+      const tile=MundoWorld.add(world,"Portal/Biblioteca",1);
+      tile.p=[0,.05,2];tile.s=[4,.1,1.5];
+      portals.push({from:1,tile:String(tile.id),to:2});
+    }
+    Scene.add(world,{label:"Emisión",preset:clip.key,position:[0,0,0],radius:10,
+      spatial:"2d",group:"musica",volume:1});
+    worlds.push(await MundoProject.draft(id,world,id===1?"Plaza inicial":"Biblioteca",null,null));
+    clips.push(clip);
+  }
+  const index={name:"Paseo privado",start:1,worlds,portals};
+  const project=await Project.exportProject(index,key=>clips.find(clip=>clip.key===key));
+  const bytes=Buffer.from(await project.blob.arrayBuffer());
+  const room=await roomFromSource(readRoomSource("Paseo.mprojectaudio",bytes)),host=createHost(room,{port:0});
+  const capture=outputCapture(),origin=await host.start(),revisions=[];
+  host.server.on("request",req=>{if(req.url==="/room/audio")revisions.push(room.revision);});
+  let guest;
+  t.after(async()=>{try{if(guest)await guest.stop();}finally{await host.close();}});
+  guest=await player(origin,room.seats[0],"Plaza inicial",{AudioContext:capture.AudioContext,Float32Array});
+  await guest.get("audioEnable").onclick();
+  await until(()=>capture.signal(1) && room.seats[0].player.scene==="ready" && room.seats[0].player.body.grounded);
+  const first=room.revision;assert.deepEqual(revisions,[first]);assert.equal(capture.signal(-1),false);
+  guest.handlers.keydown({code:"KeyW",preventDefault(){}});
+  await until(()=>guest.get("world").textContent==="Biblioteca" && capture.signal(-1));
+  guest.handlers.keyup({code:"KeyW"});
+  assert.notEqual(first,room.revision);assert.deepEqual(revisions,[first,room.revision]);
+  assert.equal(capture.signal(1),false);
+  await guest.get("roomAction").onclick();assert.equal(capture.device.state,"closed");
 });

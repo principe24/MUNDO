@@ -1,10 +1,16 @@
 # Mundo Engie
 
-**Versión privada 0.57.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
+**Versión privada 0.58.0 · MUNDO ENTERTAINMENT LLC · 23 de noviembre de 2026**
 
 Mundo Engie es el motor de MUNDO Studio, la aplicación de creación, y de MUNDO, la plataforma donde la gente entra a jugar las experiencias en línea. Los creadores pueden diseñar mapas de géneros y estilos distintos. El formato `.mworld` guarda sus escenas. Las casas, los vehículos y los objetos pueden utilizar modelos tridimensionales con superficies y materiales propios. El detalle gráfico se ajusta por dispositivo.
 
 **Meta del propietario.** Desarrollar un motor propio de propósito general con un alcance comparable a Unreal. MUNDO y MUNDO Studio son las primeras aplicaciones del motor.
+
+## Transiciones del mezclador · 0.58.0
+
+Los buses de ambiente, efectos, música y voces, además del volumen general, admiten cambios inmediatos o transiciones con duración acotada. El motor nativo y el mezclador web calculan las mismas ganancias por muestra. Studio permite escuchar los cambios con una transición configurable sin alterar la escena publicada.
+
+[Configurar y verificar las transiciones](docs/AUDIO_058.md)
 
 ## Audio de Studio a la partida · 0.57.0
 

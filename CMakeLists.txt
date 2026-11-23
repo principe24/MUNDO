@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(MundoEngie VERSION 0.57.0 LANGUAGES C CXX)
+project(MundoEngie VERSION 0.58.0 LANGUAGES C CXX)
 
 set(MUNDO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 include(cmake/Sources.cmake)

@@ -106,8 +106,9 @@ window.MundoStudioAudioPanel = function({world, edit, redraw, camera, mark, canc
     const input = get(id);
     if (!input.validity.valid) return;
     const level = input.valueAsNumber / 100;
-    if (group) active.output.setGroupVolume(group,level);
-    else active.output.setVolume(level);
+    const transition=get("audioTransition"), milliseconds=transition.validity.valid ? transition.valueAsNumber : 0;
+    if (group) active.output.setGroupVolume(group,level,milliseconds);
+    else active.output.setVolume(level,milliseconds);
   }
   for (const [id,group] of levels) get(id).oninput = () => setLevel(id,group);
 

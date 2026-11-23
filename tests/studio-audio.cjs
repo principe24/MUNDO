@@ -72,6 +72,7 @@ test("Studio conserva fuentes independientes, valores espaciales, deshacer y el 
 
 test("Studio informa de salida no disponible y sigue editando el mismo mundo", async () => {
   const el = mount({}).element;
+  assert.equal(el("audioTransition").value,"250");
   assert.equal(el("audioMix").disabled,true);
   await el("audioSolo").click();
   assert.match(el("audioStatus").textContent,/salida de audio/i);

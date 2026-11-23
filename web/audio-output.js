@@ -114,9 +114,9 @@ globalThis.MundoAudioOutput = (() => {
         mixer?.clearClips();
         stopQueue(); pump();
       },
-      setGroupVolume(group, level) {
+      setGroupVolume(group, level, milliseconds = 0) {
         if (closed) return;
-        mixer?.setGroupVolume(group, level);
+        if (mixer) milliseconds ? mixer.fadeGroupVolume(group, level, milliseconds) : mixer.setGroupVolume(group, level);
         groups.set(group, level);
       },
       trigger(id) {
@@ -151,10 +151,17 @@ globalThis.MundoAudioOutput = (() => {
         position = next; yaw = angle;
         if (mixer) mixer.setListener(next, angle);
       },
-      setVolume(next) {
+      setVolume(next, milliseconds = 0) {
         if (closed || !Number.isFinite(next)) return;
         volume = Math.max(0, Math.min(1, next));
-        if (gain) gain.gain.value = volume;
+        if (gain) {
+          const control=gain.gain;
+          if (milliseconds > 0 && milliseconds <= 60000 && control.cancelScheduledValues && control.setValueAtTime && control.linearRampToValueAtTime) {
+            control.cancelScheduledValues(context.currentTime);
+            control.setValueAtTime(control.value,context.currentTime);
+            control.linearRampToValueAtTime(volume,context.currentTime+milliseconds/1000);
+          } else control.value = volume;
+        }
         pump();
       },
       setPaused(next) {

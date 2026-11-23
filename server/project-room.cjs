@@ -48,7 +48,7 @@ function worldIdentity(def,root){
 }
 function sceneCheckpoint(scene,now){
   return {...worldIdentity(scene.def,scene.root),car:scene.vehicle.available?scene.vehicle.checkpoint():null,
-    course:scene.course?.checkpoint(now)??null};
+    course:scene.course?.checkpoint(now)??null,...(scene.npcs?{npcs:scene.npcs.checkpoint()}:{})};
 }
 function restoreSceneCheckpoint(scene,data,now){
   if(!data || typeof data!=="object" || !Number.isFinite(now) || scene.seats.some(s=>s.player))return false;
@@ -56,9 +56,15 @@ function restoreSceneCheckpoint(scene,data,now){
   if(Object.keys(identity).some(key=>data[key]!==identity[key]))return false;
   if(scene.vehicle.available?!scene.vehicle.canRestoreCheckpoint(data.car):data.car!==null)return false;
   if(scene.course?!scene.course.canRestoreCheckpoint(data.course,now):data.course!==null)return false;
-  // Both validators are pure. No seat or simulation step can intervene between validation and application.
+  // A legacy checkpoint omits actors. When present validate the entire group
+  // before changing the car or the circuit. Restored seats always start fresh.
+  if(data.npcs!==undefined && (!scene.npcs || !scene.npcs.canRestore(data.npcs)))return false;
   if(scene.vehicle.available && !scene.vehicle.restoreCheckpoint(data.car))return false;
   if(scene.course && !scene.course.restoreCheckpoint(data.course,now))return false;
+  if(data.npcs!==undefined){
+    const obstacles=scene.vehicle.chassisBounds?[scene.vehicle.chassisBounds]:[];
+    if(!scene.npcs.restore(data.npcs,{obstacles}))return false;
+  }
   return true;
 }
 
@@ -112,15 +118,20 @@ class ProjectTravel {
     const next=stage(def,parked?.course);
     if(parked?.car && !next.vehicle.restoreCheckpoint(parked.car))
       throw Error("No se pudo colocar el turismo en su posición guardada.");
+    if(parked?.npcs && !next.npcs?.restore(parked.npcs,{
+      obstacles:next.vehicle.chassisBounds?[next.vehicle.chassisBounds]:[]
+    }))throw Error("No se pudo recuperar la patrulla de este mundo.");
     return next;
   }
   parkedState(scene){
-    return {def:scene.def,root:scene.root,car:scene.vehicle.available?scene.vehicle.checkpoint():null,course:scene.course};
+    return {def:scene.def,root:scene.root,car:scene.vehicle.available?scene.vehicle.checkpoint():null,course:scene.course,
+      ...(scene.npcs?{npcs:scene.npcs.checkpoint()}:{})};
   }
   checkpoint(now){
     const worlds=[sceneCheckpoint(this.active,now)];
     for(const entry of this.parked.values()){
-      worlds.push({...worldIdentity(entry.def,entry.root),car:entry.car,course:entry.course?.checkpoint(now)??null});
+      worlds.push({...worldIdentity(entry.def,entry.root),car:entry.car,course:entry.course?.checkpoint(now)??null,
+        ...(entry.npcs?{npcs:entry.npcs}:{})});
     }
     worlds.sort((a,b)=>a.id-b.id);
     return fitCourseHistory({project:this.project.hash,active:this.active.def.entry.id,worlds});

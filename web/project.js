@@ -111,7 +111,9 @@ window.MundoProject = (() => {
     // publication may use the exact same room bytes with different records.
     if (verifiedBlobs.has(blob)) blob = blob.slice(0, blob.size, blob.type);
     verifiedBlobs.set(blob,{hash:room.hash,tiles,components});
-    return Object.freeze({id, source, blob, tiles, gates:room.gates, startMode:room.startMode, gateCount, title:room.title, revision:room.revision, size:blob.size, hash:room.hash});
+    // This count is derived from verified scene bytes; the project manifest never supplies it.
+    const npcCount=globalThis.MundoNpcRoutes?.definitions(room.world).length??0;
+    return Object.freeze({id, source, blob, tiles, npcCount, gates:room.gates, startMode:room.startMode, gateCount, title:room.title, revision:room.revision, size:blob.size, hash:room.hash});
   }
   async function draft(id, world, title, vehicleRoot, meetingPoint) {
     // Capture all mutable fields before the first asynchronous operation.

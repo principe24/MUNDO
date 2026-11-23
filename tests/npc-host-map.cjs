@@ -74,3 +74,23 @@ test("wire encoding preserves base snapshots and rejects ambiguous or unrepresen
     assert.throws(()=>encodeNpcs(base,bad),RangeError);
   }
 });
+
+test("an admitted player only sees NPCs inside the installed sector",()=>{
+  const world=MundoWorld.empty(),ground=MundoWorld.add(world,"Suelo",1);
+  ground.s=[500,.5,48];ground.p=[0,-.25,0];
+  for(const x of [-5,95]){
+    const route=routes.addRoute(world,"Zona "+x,[[x+2,0,1]]);
+    routes.addNpc(world,{label:"Guía",route,spawn:[x,0,1],mode:"patrol",speed:2,waitSeconds:0});
+  }
+  const room=makeRoom(Buffer.from(MundoWorld.encode(world)),"Sectores",()=>0);
+  const seat=room.authorize(room.seats[0].invite,"a".repeat(48),true);
+  const cmd={seq:1,mask:0,yaw:0,jump:false},msg={revision:room.revision};
+  const visible=()=>room.input(seat,cmd,"ready",true).npcs.map(n=>n.position[0]);
+  assert.deepEqual(visible(),[-5,95]);
+  room.sectorWindow(seat,seat.player,msg,undefined);
+  assert.deepEqual(visible(),[]);
+  room.sectorWindow(seat,seat.player,msg,{cx:0,cz:0,radius:0});
+  assert.deepEqual(visible(),[-5]);
+  room.sectorWindow(seat,seat.player,msg,null);
+  assert.deepEqual(visible(),[-5,95]);
+});

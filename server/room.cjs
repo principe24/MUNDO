@@ -31,7 +31,7 @@ function makeSession(single,project,store,now=()=>performance.now()){
   const aheadUsage=new AheadUsage();
   const travel=project?new ProjectTravel(project,seats,now):null;
   const scene=()=>travel?.active??single;
-  const eligible=travel?[...project.worlds.values()].some(def=>def.gates.length):Boolean(single.course);
+  const eligible=travel?[...project.worlds.values()].some(def=>def.gates.length || def.entry.npcCount):Boolean(single.course || single.npcs);
   const recovery=new RoomRecovery(eligible?store:null,
     t=>travel?travel.checkpoint(t):sceneCheckpoint(single,t),
     (data,t)=>travel?travel.restoreCheckpoint(data,t):restoreSceneCheckpoint(single,data,t));

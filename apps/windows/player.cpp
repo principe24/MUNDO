@@ -434,7 +434,7 @@ LRESULT CALLBACK player_window(HWND window, UINT event, WPARAM w, LPARAM l) {
         case WM_ERASEBKGND: return 1;
         case WM_PAINT: {PAINTSTRUCT ps{}; BeginPaint(window, &ps); EndPaint(window, &ps); return 0;}
         case WM_CLOSE:
-            if(p->online)p->connection.leave();
+            if(p->online){p->online->audio.suspend();p->connection.leave();}
             p->surface.reset();
             if (p->fullscreen) SetMenu(window, p->menu);
             DestroyWindow(window); return 0;
@@ -483,6 +483,8 @@ void update_room(Player& p, Clock::time_point now) {
         if(installed){
             play.scene.install(state,play.actors);
             play.audio.install(play.scene.world(), true);
+            for (const auto& clip : state.audio_clips)
+                play.audio.install_clip(clip.key, std::as_bytes(std::span(clip.bytes)));
             play.course_caption.clear();
             play.next_course_guide={};
             neutral_controls(p);

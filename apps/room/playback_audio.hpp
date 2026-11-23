@@ -27,8 +27,21 @@ public:
         const auto scene = audio::read_scene(world);
         if (new_session || !scene || scene->count == 0) suspend();
         std::lock_guard guard(mutex_);
-        if (new_session || !scene) mixer_.reset();
+        if (new_session || !scene) {
+            mixer_.reset();
+            mixer_.clear_clips();
+        }
         enabled_ = scene && mixer_.set_scene(*scene) && mixer_.has_sources();
+    }
+
+    // Validate and decode outside the mixer's short control-thread critical section.
+    bool install_clip(std::string_view key, std::span<const std::byte> data) {
+        if (!enabled_) return false;
+        const auto* bytes = reinterpret_cast<const std::uint8_t*>(data.data());
+        auto clip = audio::decode_clip(key, {bytes, data.size()});
+        if (!clip) return false;
+        std::lock_guard guard(mutex_);
+        return mixer_.set_clip(key, std::move(clip));
     }
 
     // Called on the owning game thread, only after an admitted local player has a pose.

@@ -19,7 +19,7 @@ function pedestrianBox([x,y,z]){
   return {pedestrian:true,min:[x-.28,y,z-.28],max:[x+.28,y+1.68,z+.28]};
 }
 
-function makeRoomCar(world,scene,seats,{MundoDriving,MundoMeeting,MundoBrumaLook},vehicleRoot=null,meetingPoint=null){
+function makeRoomCar(world,scene,seats,{MundoDriving,MundoMeeting,MundoBrumaLook},vehicleRoot=null,meetingPoint=null,npcBoxes=null){
   const {car,road,grid}=MundoDriving.roomStart(world,scene,vehicleRoot);
   const authored=car?{x:car.x,z:car.z,yaw:Math.atan2(Math.sin(car.yaw),Math.cos(car.yaw))}:null;
   const meeting=meetingPoint===null?null:MundoMeeting.plan(road,car,meetingPoint);
@@ -36,17 +36,29 @@ function makeRoomCar(world,scene,seats,{MundoDriving,MundoMeeting,MundoBrumaLook
     // Walkers use the same oriented footprint that stops the driving simulation.
     walking.overlaps=(b,x,z)=>b.chassis?car.intersects(pedestrianBox([x,0,z])):road.overlaps(b,x,z);
   }
+  function clearOfNpcs([x,y,z]){
+    return !npcBoxes || !npcBoxes().some(b=>x+.28>b.min[0] && x-.28<b.max[0] &&
+      y+1.68>b.min[1] && y<b.max[1] && z+.28>b.min[2] && z-.28<b.max[2]);
+  }
   function others(except){
-    return seats.filter(s=>s.id!==except&&!aboard(s.id)&&s.player)
+    const peers=seats.filter(s=>s.id!==except&&!aboard(s.id)&&s.player)
       .map(s=>pedestrianBox(s.player.body.position));
+    if(npcBoxes)peers.push(...npcBoxes());
+    return peers;
   }
   function newBody(id,separate=false){
     const body=Object.create(walking);
+    if(npcBoxes)body.moveAxis=function(index,change){
+      if(!change)return;
+      const p=this.position,previous=p[index],height=p[1];
+      walking.moveAxis.call(this,index,change);
+      if(p[index]!==previous && !clearOfNpcs(p)){p[index]=previous;p[1]=height;}
+    };
     if(recoveryArrival || meeting){
       const other=seats[1-id].player;
       const otherFeet=other?.body.position??null;
       const arrival=recoveryArrival??meeting;
-      const feet=arrival.position(id,otherFeet)??(meeting && arrival!==meeting?meeting.position(id,otherFeet):null);
+      const feet=arrival.position(id,otherFeet,undefined,clearOfNpcs)??(meeting && arrival!==meeting?meeting.position(id,otherFeet,undefined,clearOfNpcs):null);
       if(!feet)return null;
       body.position=feet;body.spawn=feet.slice();body.grounded=true;
       return body;
@@ -64,9 +76,9 @@ function makeRoomCar(world,scene,seats,{MundoDriving,MundoMeeting,MundoBrumaLook
       }
     }
     const otherFeet=seats[1-id].player?.body.position;
-    if(separate && otherFeet && MundoMeeting.overlapsPlayer(body.position,otherFeet)){
+    if((separate && otherFeet && MundoMeeting.overlapsPlayer(body.position,otherFeet)) || !clearOfNpcs(body.position)){
       let feet;
-      try{feet=MundoMeeting.plan(road,car,road.spawn).position(id,otherFeet,false);}catch{return null;}
+      try{feet=MundoMeeting.plan(road,car,road.spawn).position(id,otherFeet,false,clearOfNpcs);}catch{return null;}
       if(!feet)return null;
       body.position=feet;body.spawn=feet.slice();body.grounded=true;
     }
@@ -81,7 +93,7 @@ function makeRoomCar(world,scene,seats,{MundoDriving,MundoMeeting,MundoBrumaLook
     if(!meeting)return "off";
     if(aboard(seat.id))return "aboard";
     const other=seats[1-seat.id].player;
-    const feet=meeting.position(seat.id,other?.body.position,false);
+    const feet=meeting.position(seat.id,other?.body.position,false,clearOfNpcs);
     if(!feet || !fits(square,feet[0],feet[2]))return "blocked";
     const {body,keys}=seat.player;
     body.position=feet;

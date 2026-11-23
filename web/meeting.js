@@ -69,8 +69,8 @@ window.MundoMeeting = (() => {
     const initial = candidates.filter(feet => !blockedByCar(feet, car)).slice(0, 2);
     if (initial.length !== 2)
       throw Error("El punto de encuentro necesita suelo y espacio libre para dos jugadores en la misma zona.");
-    function position(seat, otherFeet, reservePair = !otherFeet) {
-      const available = feet => !blockedByCar(feet, car) && (!otherFeet || !overlapsPlayer(feet, otherFeet));
+    function position(seat, otherFeet, reservePair = !otherFeet, clear = null) {
+      const available = feet => !blockedByCar(feet, car) && (!otherFeet || !overlapsPlayer(feet, otherFeet)) && (!clear || clear(feet));
       if (!reservePair) {
         if (available(initial[seat])) return initial[seat].slice();
         const replacement = candidates.find(available);

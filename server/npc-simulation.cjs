@@ -63,6 +63,7 @@ class NpcSimulation {
     this.navigation = navigation;
     this.actors = definitions.map(newActor);
     if (new Set(this.actors.map(a => a.id)).size !== this.actors.length) throw Error("Identificador de NPC repetido.");
+    this.cachedBoxes = null;
     this.tick = 0;
     this.remainder = 0;
     this.first = 0;
@@ -97,6 +98,7 @@ class NpcSimulation {
     this.remainder += Math.min(elapsedSeconds, STEP * MAX_STEPS);
     const steps = Math.min(MAX_STEPS, Math.floor((this.remainder + 1e-9) / STEP));
     this.remainder = Math.max(0, this.remainder - steps * STEP);
+    if (steps) this.cachedBoxes = null;
     for (let i = 0; i < steps; i++) {
       this.tick++;
       let canPlan = true;
@@ -294,9 +296,17 @@ class NpcSimulation {
     const actors = this.prepareCheckpoint(data, obstacles);
     if (!actors) return false;
     this.actors = actors;
+    this.cachedBoxes = null;
     this.remainder = 0;
     this.first = 0;
     return true;
+  }
+
+  pedestrianBoxes() {
+    // Shared read-only broad-phase for every walker/vehicle query until the next tick.
+    if (!this.cachedBoxes) this.cachedBoxes = this.actors.filter(a => a.feet)
+      .map(a => ({...bodyBox(a.feet), pedestrian:true}));
+    return this.cachedBoxes;
   }
 
   inspect() {

@@ -121,10 +121,19 @@ function makeSession(single,project,store,now=()=>performance.now()){
     }:null,activeWindow);
     const npcs=scene().npcs;
     if(npcs && seats.some(seat=>seat.player)){
-      const players=seats.filter(seat=>seat.player && !vehicle.aboard(seat.id) &&
-        seat.player.scene!=="loading" && seat.player.scene!=="idle" && activeWindow(seat.id)!==undefined)
-        .map(seat=>({id:seat.id,position:seat.player.body.position}));
-      npcs.advance(elapsed,{players,obstacles:vehicle.chassisBounds?[vehicle.chassisBounds]:[]});
+      const players=[],obstacles=vehicle.chassisBounds?[vehicle.chassisBounds]:[];
+      for(const seat of seats){
+        if(!seat.player || vehicle.aboard(seat.id))continue;
+        const position=seat.player.body.position;
+        if(seat.player.scene!=="loading" && seat.player.scene!=="idle" && activeWindow(seat.id)!==undefined){
+          players.push({id:seat.id,position});
+        }else{
+          // A paused pedestrian still occupies its space without attracting followers.
+          const [x,y,z]=position;
+          obstacles.push({min:[x-.28,y,z-.28],max:[x+.28,y+1.68,z+.28]});
+        }
+      }
+      npcs.advance(elapsed,{players,obstacles});
     }
     observe();
   }

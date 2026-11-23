@@ -27,12 +27,13 @@ function stage(def,savedCourse=null){
   const geometry=api.MundoGeometry.flatten(world);
   const {gates,startMode}=def.gates && def.startMode?def:api.MundoCircuit.read(world);
   const seats=[{id:0,player:null},{id:1,player:null}];
-  const vehicle=makeRoomCar(world,geometry,seats,api,def.vehicleRoot,def.meetingPoint);
+  const definitions=npcRoutes.definitions(world);
+  let npcs=null;
+  const vehicle=makeRoomCar(world,geometry,seats,api,def.vehicleRoot,def.meetingPoint,
+    definitions.length?()=>npcs?.pedestrianBoxes()??[]:null);
   if(gates.length && !vehicle.available)throw Error("El circuito necesita un turismo de sala.");
   const course=gates.length?(savedCourse??new CircuitRun(gates,def.record,startMode)):null;
-  const definitions=npcRoutes.definitions(world);
   // The authored car changes position. Its meshes must never become fixed walls.
-  let npcs=null;
   if(definitions.length){
     const solids=geometry.objects.filter(piece=>!vehicle.isVehiclePart(piece.n.id));
     const obstacles=vehicle.chassisBounds?[vehicle.chassisBounds]:[];

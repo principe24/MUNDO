@@ -79,6 +79,7 @@ bool Session::join_room(std::string_view link) {
 
 void Session::end_room(std::string message) {
     pause();
+    if(room_)room_->audio.suspend();
     if(room_)room_->entry.clear(surface_.get());
     if(surface_)surface_->discard_scene();
     connection_.leave();
@@ -107,6 +108,7 @@ void Session::set_room_active(bool active) {
         room_->presented=false;
         room_->course.clear();
         room_->entry.clear(surface_.get());
+        room_->audio.suspend();
         room_->scene.suspend();
         if(surface_)surface_->discard_scene();
         if(room_->phase==room::Phase::playing){
@@ -147,6 +149,7 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
             return false;
         }
         if(play.phase==room::Phase::playing && state.phase!=room::Phase::playing){
+            play.audio.suspend();
             play.scene.suspend();
             play.course.clear();
             surface_->discard_scene();
@@ -158,11 +161,13 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
             play.course.clear();
             play.title = state.title;
             play.scene.install(state,play.actors);
+            play.audio.install(play.scene.world(), true);
             pause();
             play.look.yaw=0.;play.look.pitch=0.;
         }
         if(state.region){
             play.scene.replace_region(std::move(state.region->world),std::move(state.region->terrain));
+            play.audio.install(play.scene.world(), false);
             surface_->trim_on_next_scene();
         }
         if (installed || state.region) state.confirm_install();
@@ -204,6 +209,7 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
         }
     }
     if (play.phase!=room::Phase::playing || !play.scene.ready()) {
+        play.audio.suspend();
         play.presented=false;
         return play.entry.draw(*surface_,caps);
     }
@@ -234,7 +240,7 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
         jump_requested_ = false;
     }
     const auto feet = play.actors.local_feet();
-    if (!feet) return false;
+    if (!feet) { play.audio.suspend(); return false; }
     CameraPose camera;
     bool show_self = false;
     if (aboard) {
@@ -245,6 +251,7 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
         camera.forward = {cp * std::sin(play.look.yaw), std::sin(play.look.pitch), -cp * std::cos(play.look.yaw)};
         show_self = play.look.third_person && play.actors.follow_pedestrian(camera, play.scene.terrain());
     }
+    play.audio.frame(*feet, std::atan2(camera.forward.x, -camera.forward.z));
     const bool submitted=surface_->frame_with_peer(play.scene.world(), camera, caps, show_self ? play.actors.local_avatar() : nullptr,
                               play.actors.peer_avatar(),play.actors.vehicles(),play.actors.npc_avatars());
     if(submitted)play.presented=true;

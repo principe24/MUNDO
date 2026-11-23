@@ -1,6 +1,7 @@
 #include "resources.h"
 #include "entry_view.hpp"
 #include "active_scene.hpp"
+#include "playback_audio.hpp"
 #include "room_client.hpp"
 #include "mundo/room_view.hpp"
 #include "mundo/surface.hpp"
@@ -27,6 +28,7 @@ struct RoomPlay {
     room::View actors;
     room::EntryView entry;
     room::ActiveScene scene{2};
+    room::PlaybackAudio audio;
     CameraPose camera;
     double yaw{}, pitch{};
     bool third_person{true}, draw_self{}, jump_pressed{};
@@ -131,6 +133,7 @@ void suspend_room(Player& p) {
     auto& play=*p.online;
     play.entry.clear(p.surface.get());
     play.scene.suspend();
+    play.audio.suspend();
     play.course_caption.clear();
     play.next_course_guide={};
     if(p.surface)p.surface->discard_scene();
@@ -156,6 +159,7 @@ bool enter_room(Player& p,std::wstring_view invitation) {
 }
 void leave_room(Player& p) {
     if(!p.online)return;
+    p.online->audio.suspend();
     p.online->entry.clear(p.surface.get());
     if(p.surface)p.surface->discard_scene();
     p.connection.leave();
@@ -468,6 +472,7 @@ void update_room(Player& p, Clock::time_point now) {
             return;
         }
         if(play.phase==room::Phase::playing && state.phase!=room::Phase::playing){
+            play.audio.suspend();
             play.scene.suspend();
             play.course_caption.clear();
             play.next_course_guide={};
@@ -477,6 +482,7 @@ void update_room(Player& p, Clock::time_point now) {
         const bool installed=state.world.has_value();
         if(installed){
             play.scene.install(state,play.actors);
+            play.audio.install(play.scene.world(), true);
             play.course_caption.clear();
             play.next_course_guide={};
             neutral_controls(p);
@@ -484,6 +490,7 @@ void update_room(Player& p, Clock::time_point now) {
         }
         if(state.region){
             play.scene.replace_region(std::move(state.region->world),std::move(state.region->terrain));
+            play.audio.install(play.scene.world(), false);
             p.surface->trim_on_next_scene();
         }
         if (installed || state.region) state.confirm_install();
@@ -596,6 +603,7 @@ void run(Player& p) {
         }
         auto now = Clock::now();
         if (IsIconic(p.window) || GetForegroundWindow() != p.window) {
+            if(p.online)p.online->audio.suspend();
             p.last_report = {}; p.frames = 0;
             // Input and focus events wake the inactive player without polling the GPU.
             MsgWaitForMultipleObjectsEx(0, nullptr, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
@@ -604,6 +612,7 @@ void run(Player& p) {
         }
         if(p.online)update_room(p,now);
         if(!p.online || p.online->phase!=room::Phase::playing || !p.online->scene.ready() || !p.online->actors.local_feet()){
+            if(p.online)p.online->audio.suspend();
             if(p.online && p.online->entry.draw(*p.surface,{}))
                 show_lobby(p,L"Zona de entrada · "+p.online->caption,true);
             else if(p.online && p.online->phase==room::Phase::playing && !p.online->scene.ready())
@@ -614,6 +623,8 @@ void run(Player& p) {
             MsgWaitForMultipleObjectsEx(0,nullptr,p.online?25:INFINITE,QS_ALLINPUT,MWMO_INPUTAVAILABLE);
             continue;
         }
+        const auto& forward = p.online->camera.forward;
+        p.online->audio.frame(*p.online->actors.local_feet(), std::atan2(forward.x, -forward.z));
         const auto cap = p.surface->video_profile().settings().fps_cap;
         if (cap && p.last_present != Clock::time_point{}) {
             const auto remaining = 1000.0/cap - std::chrono::duration<double,std::milli>(now-p.last_present).count();

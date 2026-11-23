@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Taller de vehículos · MUNDO Studio</title>
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+  <header><span class="symbol" aria-hidden="true">M</span><b>MUNDO <span>Studio</span></b><a href="Mundos.html">Editor de mundos</a></header>
+  <main>
+    <section class="viewport" aria-label="Vista del carro de bloques">
+      <h1>Taller de vehículos</h1>
+      <canvas id="scene" tabindex="0" aria-label="Vista 3D del carro. Arrastra o usa las flechas para girar."></canvas>
+      <div class="camera"><button id="left" aria-label="Girar a la izquierda">↶</button><span>Girar vista</span><button id="right" aria-label="Girar a la derecha">↷</button></div>
+    </section>
+    <aside aria-label="Propiedades del vehículo">
+      <h2>Carro de bloques</h2>
+      <label for="name">Nombre del vehículo</label><input id="name" value="Turismo" maxlength="40" autocomplete="off">
+      <fieldset><legend>Carrocería</legend>
+        <label for="length">Largo <output id="lengthValue" for="length"></output></label><input type="range" id="length" min="3" max="6" step="0.05" value="4.2">
+        <label for="width">Ancho <output id="widthValue" for="width"></output></label><input type="range" id="width" min="1.4" max="2.7" step="0.05" value="1.85">
+        <label class="swatch" for="paint">Pintura <input type="color" id="paint" value="#39cbbf"></label>
+      </fieldset>
+      <fieldset><legend>Ruedas</legend>
+        <label for="wheel">Diámetro <output id="wheelValue" for="wheel"></output></label><input type="range" id="wheel" min="0.45" max="1.05" step="0.02" value="0.69">
+      </fieldset>
+      <button class="export" id="export">Guardar mundo <span>↓</span></button>
+      <label class="meeting-choice"><input id="meetAtCar" type="checkbox">Reunir a los jugadores junto al turismo</label>
+      <button type="button" id="drive">Preparar sala con este carro</button>
+      <button id="saveTrack">Guardar pista con el carro</button>
+      <button id="prepareRoom">Preparar sala privada</button>
+      <a id="downloadRoom" hidden>Descargar sala (.mroom)</a>
+      <p id="status" role="status" aria-live="polite">Archivo de MUNDO · .mworld</p>
+    </aside>
+  </main>
+  <script src="../web/world.js"></script>
+  <script src="../web/geometry.js"></script><script src="../mundo/drive.js"></script><script src="../mundo/walk.js"></script><script src="../web/meeting.js"></script>
+  <script src="preview.js"></script><script src="../web/room-file.js"></script><script src="publications.js"></script><script src="tools.js"></script><script src="vehicle-model.js"></script><script src="vehicle.js"></script>
+</body>
+</html>

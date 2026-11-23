@@ -1,0 +1,43 @@
+:root { color-scheme: dark; font: 100%/1.55 "Inter", system-ui, sans-serif; background: #111817; color: #eef5f1; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 52rem; padding: clamp(1rem, 5vw, 3rem); margin: auto; }
+header { border-bottom: 2px solid #85d9ba; padding-bottom: 1.2rem; }
+header span, .label { color: #96d9bf; font-weight: 650; }
+h1 { font-size: clamp(2rem, 6vw, 3.3rem); line-height: 1.12; letter-spacing: -.045em; margin: .25rem 0; }
+h2, h3 { line-height: 1.25; margin: 0 0 .7rem; overflow-wrap: anywhere; }
+section, dialog { background: #1b2724; border: 1px solid #42564e; border-radius: .7rem; padding: 1.3rem; margin-bottom: 1rem; }
+#message { min-height: 1.55em; }
+.label { font-size: .9rem; margin: 0 0 .45rem; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-top: .85rem; }
+button, input { font: inherit; max-width: 100%; }
+button { border: 1px solid transparent; color: #10251c; background: #a0e3c4; font-weight: 650; padding: .5rem .85rem; border-radius: .4rem; cursor: pointer; }
+.secondary, .danger { border-color: #5b7468; color: inherit; background: transparent; }
+.danger { color: #ffc1aa; }
+button:disabled { opacity: .55; cursor: default; }
+:focus-visible { outline: 3px solid #ffd787; outline-offset: 2px; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1rem; }
+dt, aside { color: #b4c9be; }
+dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+article { border-top: 1px solid #43594e; padding: 1rem 0; }
+article p { margin: 0; }
+dialog { max-width: min(95vw,37rem); margin: auto; }
+dialog::backdrop { background: #000a; }
+#link { width: 100%; margin: .6rem 0 1rem; }
+@media (max-width: 32rem) { dl { display: block; } dd { margin-bottom: .65rem; } }
+
+select { display: block; font: inherit; max-width: 100%; padding: .45rem; margin-top: .3rem; }
+[hidden] { display: none !important; }
+
+#qrCanvas { display: block; width: min(70vw, 44vh, 20rem); height: auto; margin: .75rem auto; image-rendering: pixelated; }
+#trackingDetails summary, #usageDetails summary, #timingDetails summary { font-size: 1.15rem; font-weight: 650; cursor: pointer; }
+#trackingMap { display: block; width: 100%; height: auto; border-radius: .45rem; margin-top: .8rem; }
+#trackingSummary { white-space: pre-line; }
+.usage-metrics { font-variant-numeric: tabular-nums; }
+#usageFetchStatus:empty, #usageExportStatus:empty { display: none; }
+.timing-scroll { overflow-x:auto; margin:.75rem 0; }
+#timingTable { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+#timingTable caption { text-align:start; color:#b4c9be; font-size:.9rem; margin-bottom:.4rem; }
+#timingTable th, #timingTable td { padding:.4rem; border-bottom:1px solid #42564e; text-align:end; }
+#timingTable th:first-child { text-align:start; min-width:7rem; }
+#timingNotice:empty, #timingExportStatus:empty { display:none; }

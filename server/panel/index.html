@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Anfitrión · MUNDO Studio</title>
+  <link rel="stylesheet" href="/panel.css">
+  <script src="/route-map.js" defer></script>
+  <script src="/ahead-usage.js" defer></script>
+  <script src="/web/course-timing.js" defer></script>
+  <script src="/timing-panel.js" defer></script>
+  <script src="/panel.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><span>MUNDO Studio</span><h1>Panel del anfitrión</h1></header>
+    <p id="message" role="status">Conectando con el anfitrión…</p>
+    <section id="source" hidden>
+      <h2>Abrir una revisión</h2>
+      <p><a href="/studio/Mundos.html">Abrir el editor de MUNDO Studio</a></p>
+      <label for="file">Proyecto de juego .mproject, sala .mroom o .mroom3d, o mundo .mworld</label>
+      <div class="actions"><input type="file" id="file" accept=".mproject,.mroom,.mroom3d,.mworld"><button id="prepare">Preparar archivo</button></div>
+    </section>
+    <section id="details" hidden>
+      <p class="label" id="phase"></p><h2 id="title"></h2>
+      <p id="projectRoute" hidden role="status"></p>
+      <p id="courseInfo" hidden></p><button class="secondary" id="restartCourse" hidden>Nueva vuelta</button>
+      <p id="courseRecord" hidden></p><button class="secondary" id="retryRecord" hidden>Reintentar guardar la marca</button>
+      <div id="checkpoint" hidden>
+        <h3>Recuperación de la partida</h3>
+        <p id="recoveryOrigin" hidden>Se recuperó el progreso de esta revisión al abrir la sala. Copia las nuevas invitaciones para que vuelvan los jugadores.</p>
+        <p id="checkpointState" role="status"></p>
+        <p id="checkpointTime" hidden></p>
+        <button class="secondary" id="saveCheckpoint">Guardar partida ahora</button>
+      </div>
+      <dl><dt>Archivo</dt><dd id="filename"></dd><dt>Publicación</dt><dd id="publication"></dd>
+        <dt>Turismo</dt><dd id="car"></dd>
+        <dt>Punto de encuentro</dt><dd id="meeting"></dd>
+        <dt id="arrivalsLabel" hidden>Plazas previstas al abrir</dt>
+        <dd id="arrivals" hidden><div id="arrivalOne"></div><div id="arrivalTwo"></div></dd>
+        <dt>Huella del mundo</dt><dd><code id="hash"></code></dd></dl>
+      <div id="previewActions">
+        <button class="secondary" id="inspectZones">Calcular carga por zonas</button>
+        <div id="zoneSummary" hidden>
+          <p id="zoneBytes"></p>
+          <p id="zoneOrigin"></p>
+          <p>Huella del paquete de zonas · <code id="zoneDigest"></code></p>
+        </div>
+        <label for="address">Dónde van a jugar</label><select id="address"></select>
+        <p id="recommendedInes" hidden>MUNDO Studio recomienda a Inés para este mundo. Activa la casilla para compartirla con los jugadores de esta sala.</p>
+        <p><label><input id="shareInes" type="checkbox" autocomplete="off" aria-describedby="shareInesHelp"> Usar a Inés en esta sala web</label>
+          <br><small id="shareInesHelp">Los jugadores con plaza recibirán las mallas y la textura del personaje en su dispositivo y podrán conservar una copia.</small></p>
+        <div id="creatorChoice" hidden>
+          <label><input id="shareModels" type="checkbox" autocomplete="off"> Compartir las mallas de esta publicación con los jugadores de la sala web</label>
+          <p id="creatorInventory"></p><small>Quien tenga plaza podrá recibir y conservar estas mallas. La sala usa cajas si omites esta opción.</small>
+        </div>
+        <p id="brumaChoice"><label><input id="shareBruma" type="checkbox" autocomplete="off" aria-describedby="shareBrumaHelp"> Compartir el modelo de Bruma en esta sala web</label>
+          <br><small id="shareBrumaHelp">Cuando el turismo elegido en Studio sea Bruma, los jugadores admitidos podrán descargar y conservar su carrocería y sus ruedas.</small></p>
+        <div class="actions"><button id="start">Abrir sala</button><button class="secondary" id="discard">Descartar</button></div>
+      </div>
+    </section>
+    <section id="players" hidden>
+      <h2>Invitaciones</h2><p id="actorNotice" hidden>Inés está disponible para los jugadores de esta sala web.</p><p id="brumaNotice" hidden>El anfitrión autorizó la apariencia de Bruma en los mundos que usan el cupé.</p><p id="creatorNotice" hidden></p><p id="admissions"></p><p id="readyCount" role="status"></p><div id="seats"></div>
+      <div class="actions"><button class="secondary" id="admit"></button><button class="danger" id="close">Cerrar sala</button></div>
+    </section>
+    <section id="trackingSection" hidden>
+      <details id="trackingDetails">
+        <summary>Mapa de la partida</summary>
+        <p id="trackingWorld"></p>
+        <label for="trackingFollow">Encuadre</label>
+        <select id="trackingFollow">
+          <option value="all">Todo el recorrido</option><option value="car">Seguir al turismo</option>
+          <option value="1">Seguir a la plaza 1</option><option value="2">Seguir a la plaza 2</option>
+        </select>
+        <label><input id="trackingCoverage" type="checkbox" checked> Mostrar límites del terreno confirmado</label>
+        <canvas id="trackingMap" width="720" height="400" aria-label="Plano del recorrido y de sus ocupantes" aria-describedby="trackingSummary"></canvas>
+        <p id="trackingSummary"></p>
+      </details>
+    </section>
+    <section id="timingSection" hidden>
+      <details id="timingDetails">
+        <summary>Parciales del circuito</summary>
+        <p id="timingScope"></p>
+        <p id="timingNotice" role="status"></p>
+        <div id="timingControls" hidden>
+          <label for="timingLap">Vuelta</label>
+          <select id="timingLap"></select>
+          <p id="timingSummary"></p>
+          <div class="timing-scroll" tabindex="0" role="region" aria-label="Tiempos por puerta">
+            <table id="timingTable">
+              <caption>Referencia fijada al inicio de la vuelta. Una diferencia negativa indica un paso más rápido.</caption>
+              <thead><tr><th scope="col">Puerta</th><th scope="col">Tramo</th><th scope="col">Dif. tramo</th>
+                <th scope="col">Acumulado</th><th scope="col">Ref. acumulada</th><th scope="col">Dif. acumulada</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="actions"><button type="button" id="timingJson">Descargar informe JSON</button>
+            <button type="button" class="secondary" id="timingCsv">Descargar esta vuelta en CSV</button></div>
+          <p id="timingExportStatus" role="status"></p>
+        </div>
+      </details>
+    </section>
+    <section id="usageSection" hidden>
+      <h2>Precarga del turismo</h2>
+      <p id="usageSummary"></p>
+      <details id="usageDetails">
+        <summary>Ver ofertas de precarga</summary>
+        <p id="usageScope"></p>
+        <p id="usageFetchStatus" role="status"></p>
+        <div id="usageOffer" hidden>
+          <label for="usageSelect">Oferta</label>
+          <select id="usageSelect"></select>
+          <p id="usageRoute"></p>
+          <dl class="usage-metrics">
+            <dt>Terreno nuevo del cruce</dt><dd id="usageRequired"></dd>
+            <dt>Precarga ofrecida</dt><dd id="usagePlanned"></dd>
+            <dt>Enviados por el anfitrión</dt><dd id="usageServed"></dd>
+            <dt>De páginas distintas</dt><dd id="usageUnique"></dd>
+            <dt>De páginas repetidas</dt><dd id="usageRepeat"></dd>
+            <dt>Respuestas interrumpidas</dt><dd id="usageInterrupted"></dd>
+            <dt>Verificados por el jugador</dt><dd id="usageVerified"></dd>
+            <dt>Reutilizados por el jugador en total</dt><dd id="usageUsed"></dd>
+            <dt>En la ventana intermedia</dt><dd id="usageMiddle"></dd>
+            <dt>En la ventana de destino</dt><dd id="usageFinal"></dd>
+            <dt>Descartados al finalizar</dt><dd id="usageDiscarded"></dd>
+            <dt>Revisión del mundo</dt><dd><code id="usageRevision"></code></dd>
+          </dl>
+          <p>El anfitrión cuenta los bytes de las páginas que terminó de enviar. El reproductor declara lo que verificó, reutilizó y descartó. Los bytes de una respuesta interrumpida quedan sin medir.</p>
+        </div>
+        <button type="button" id="usageExport">Descargar registro JSON</button>
+        <p id="usageExportStatus" role="status"></p>
+      </details>
+    </section>
+    <aside id="network" hidden></aside>
+    <dialog id="qrDialog" aria-labelledby="qrLabel"><h2 id="qrLabel">Invitación</h2>
+      <p id="qrWorld"></p>
+      <canvas id="qrCanvas" aria-label="Código QR individual de invitación"></canvas>
+      <p>En MUNDO para Android o iPhone abre Sala y pulsa Escanear QR.</p>
+      <button id="hideQr">Ocultar código</button>
+    </dialog>
+    <dialog id="manual"><h2 id="copyLabel">Copiar invitación</h2>
+      <label for="link">Selecciona y copia este enlace para el jugador</label>
+      <input id="link" type="text" readonly spellcheck="false" autocomplete="off">
+      <button id="done">Listo</button>
+    </dialog>
+  </main>
+</body></html>

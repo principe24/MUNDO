@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; connect-src 'none'; img-src data:; base-uri 'none'">
+  <meta name="referrer" content="no-referrer"><title>MUNDO · Jugar en línea</title><link rel="stylesheet" href="../web/interface.css"></head>
+<body><form id="entry" class="online-entry" hidden>
+  <strong class="brand">MUNDO</strong><h1>Entrar a una partida</h1>
+  <label for="invitation">Invitación individual del anfitrión</label>
+  <input id="invitation" type="password" autocomplete="off" spellcheck="false" autocapitalize="none" maxlength="256" required>
+  <button type="submit" class="primary">Entrar a la sala</button>
+  <p id="entryStatus" role="status">Necesitas una conexión activa durante la partida.</p>
+</form><main class="playstage">
+  <canvas id="viewport" tabindex="0" aria-label="Recorrido de MUNDO. Muévete con WASD o las flechas y arrastra para mirar."></canvas>
+  <div class="room-header"><div class="playhead"><strong class="brand">MUNDO</strong><span id="world" class="pill">Sala privada</span>
+    <span class="metric" id="carGuide"></span><output class="metric" id="stats"></output><div class="group"><button id="changeInvite" hidden>Usar otra invitación</button><button id="roomAction" hidden>Salir de la sala</button><button id="open" hidden>Abrir mundo o proyecto</button><button id="useCar" hidden>Subir al carro</button><button id="secondSeat" hidden>Subir de pasajero</button><button id="cameraMode" aria-label="Cámara en tercera persona" aria-pressed="true">Cámara</button><button id="settings">Ajustes</button></div></div>
+  <div class="course-card" id="courseCard" hidden>
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <span id="courseScore"></span>
+      <span id="courseSplit"></span>
+    </div>
+    <span id="courseClock" aria-live="off"></span>
+  </div>
+  <p role="status" class="notice" id="modelNotice"></p><p role="status" class="screen-error" id="notice"></p></div>
+  <div class="meeting-action" id="meetingAction" hidden>
+    <button type="button" id="returnMeeting" hidden>Volver al punto de encuentro</button>
+    <p id="returnNotice" role="status"></p>
+  </div>
+  <div class="guidance" id="hint">WASD o flechas para moverte · Arrastra para mirar · Espacio para saltar</div>
+  <div class="touchbox" id="pad" hidden>
+    <button data-key="KeyW" aria-label="Avanzar">↑</button><button data-key="KeyA" aria-label="Izquierda">←</button>
+    <button data-key="KeyS" aria-label="Retroceder">↓</button><button data-key="KeyD" aria-label="Derecha">→</button></div>
+  <button id="jump" class="jump" hidden>Saltar</button>
+  <input type="file" accept=".mworld,.mzones,.mproject" id="file" hidden>
+  <dialog id="menu"><form id="video"><h2>Ajustes de la partida</h2><p id="family"></p>
+    <fieldset id="projectTravel" hidden><legend>Mundos del proyecto</legend>
+      <label for="travelWorld">Destino</label><select id="travelWorld"></select>
+      <p id="travelInfo" role="status"></p><button type="button" id="travelGo">Entrar al mundo</button>
+    </fieldset>
+    <p id="videoDimensions"></p>
+    <fieldset id="ownerPeopleOptions" hidden><legend>Apariencia del personaje</legend>
+      <label for="ownerPeopleFile">Usar una apariencia de este dispositivo</label>
+      <input id="ownerPeopleFile" type="file" accept=".mavatar">
+      <button id="ownerPeopleClear" type="button">Quitar la apariencia</button>
+      <button id="ownerPeopleRoom" type="button" hidden>Usar la apariencia del anfitrión</button>
+      <p id="ownerPeopleStatus" role="status" aria-live="polite"></p>
+    </fieldset>
+    <label for="resolution">Resolución interna máxima</label><select id="resolution">
+      <option value="0">Automática</option><option value="720">720p</option><option value="1080">1080p</option>
+      <option value="1440">1440p · QHD</option><option value="2160">4K · 2160p</option><option value="4320">8K · 4320p</option></select>
+    <label for="detail">Detalle</label><select id="detail"><option value="auto">Automático</option><option value="economy">Económico</option><option value="balanced">Equilibrado</option><option value="ultra">Ultra</option></select>
+    <label for="cap">Límite de FPS · 0 = sin límite interno</label><input id="cap" type="number" min="0" max="10000" step="1" required>
+    <div class="actions"><button type="button" id="reset">Predeterminados</button><button type="submit" class="primary">Guardar y volver</button></div>
+    <button type="button" id="cancel" class="full">Volver sin guardar</button><p id="feedback" role="status"></p>
+  </form></dialog>
+  <dialog id="returnDialog" aria-labelledby="returnTitle">
+    <h2 id="returnTitle">¿Volver al punto de encuentro?</h2>
+    <p>Dejarás tu posición actual si hay espacio libre en el encuentro.</p>
+    <div class="actions"><button type="button" id="cancelReturn" autofocus>Seguir aquí</button>
+      <button type="button" id="confirmReturn" class="primary">Volver al encuentro</button></div>
+  </dialog>
+</main><script src="../web/world.js"></script><script src="../web/starting-content.js"></script><script src="../web/geometry.js"></script><script src="../web/zones.js"></script>
+<script src="../web/view.js"></script><script src="walk.js"></script><script src="avatar.js"></script><script src="drive.js"></script><script src="../web/bruma-look.js"></script><script src="../web/meeting.js"></script><script src="../web/room-file.js"></script><script src="../web/circuit.js"></script><script src="../web/component-record.js"></script><script src="../web/project.js"></script><script src="residence.js"></script><script src="sectors.js"></script><script src="room.js"></script><script src="../web/creator-mesh.js"></script><script src="room-models.js"></script><script src="entrada.js"></script><script src="../web/people-rig.js"></script><script src="online-people.js"></script><script src="player.js"></script></body></html>

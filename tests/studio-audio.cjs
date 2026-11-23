@@ -243,3 +243,32 @@ test("consentimiento independiente de mallas en sala con audio, restauración y 
   if(process.env.MUNDO_STUDIO_AUDIO_FIXTURE)
     fs.writeFileSync(process.env.MUNDO_STUDIO_AUDIO_FIXTURE,combined,{flag:"wx"});
 });
+
+test("Preparar sala de un proyecto con portal conserva el sonido propio de cada destino",async()=>{
+  const studio=mount({}),el=studio.element;
+  el("new").click();
+  el("worldName").value="Vestíbulo";
+  studio.block.click();
+  el("pieceName").value="Portal/Patio";
+  el("sizesX").value="2";el("sizesY").value=".1";el("sizesZ").value="2";
+  el("props").onsubmit({preventDefault(){}});
+  el("audioName").value="Entrada";el("audioPreset").value="brisa";el("audioCreate").click();
+  await el("projectDraft").click();
+  el("new").click();
+  el("worldName").value="Patio";
+  el("audioName").value="Río";el("audioPreset").value="agua";el("audioCreate").click();
+  await el("projectDraft").click();
+  el("projectWorlds").value="1";el("projectWorlds").onchange();
+  const tile=el("portalTile").value;
+  assert(tile,el("projectStatus").textContent);
+  el("portalTarget").value="2";el("portalTarget").onchange();
+  el("portalLink").click();
+  await until("destino del portal",()=>el("projectStatus").textContent.includes("Destino guardado"));
+  await el("projectPlay").click();
+  const file=studio.getDownload();
+  assert.match(file.name,/\.mproject$/i,el("projectStatus").textContent);
+  const project=await P.open(file.blob);
+  assert.deepEqual(JSON.parse(JSON.stringify(project.portals)),[{from:1,tile,to:2}]);
+  const presets=await Promise.all(project.worlds.map(async entry=>scene.read((await P.load(entry)).world).map(s=>s.preset)));
+  assert.deepEqual(presets,[["brisa"],["agua"]]);
+});

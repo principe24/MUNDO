@@ -272,7 +272,9 @@ function createNavigation(objects, profile = {}) {
       const heuristicWeight = totalDistance > MAX_SPAN ? 1.12 : 1;
       const frontier = new Frontier(), costs = new Map();
       function enqueue(i,j,feet,cost,parent) {
-        const key = i + "," + j + "," + feet[1];
+        // The same clearance line can be derived from multiple nearby faces.
+        // Merge sub-micrometre roundoff while retaining the swept coordinates.
+        const key = Math.round(i*1e6) + "," + Math.round(j*1e6) + "," + feet[1];
         if ((costs.get(key) ?? Infinity) <= cost+EPS) return;
         costs.set(key,cost);
         frontier.push({key,i,j,feet,cost,parent,priority:cost+heuristicWeight*distance(feet[0],feet[2])});
@@ -303,12 +305,47 @@ function createNavigation(objects, profile = {}) {
           moves.push([Math.round((goal[0]-p[0])*stride/(remaining*cell)),
                       Math.round((goal[2]-p[2])*stride/(remaining*cell))]);
         }
+        let xBlocked=false, zBlocked=false;
+        function visit(i,j) {
+          const x=start[0]+i*cell, z=start[2]+j*cell;
+          if (Math.abs(x)>RANGE || Math.abs(z)>RANGE) return false;
+          const feet=sweep(p,x,z,moving,spend);
+          if (!feet) return false;
+          enqueue(i,j,feet,node.cost+Math.hypot(x-p[0],z-p[2])+Math.abs(feet[1]-p[1]),node);
+          return true;
+        }
         for (const [di,dj] of moves) {
-          const i = node.i+di, j = node.j+dj;
-          const x = start[0]+i*cell, z = start[2]+j*cell;
-          if (Math.abs(x)>RANGE || Math.abs(z)>RANGE) continue;
-          const feet = sweep(p,x,z,moving,spend);
-          if (feet) enqueue(i,j,feet,node.cost+Math.hypot(di,dj)*cell+Math.abs(feet[1]-p[1]),node);
+          if (!visit(node.i+di,node.j+dj)) {
+            if (Math.abs(di)===1 && dj===0) xBlocked=true;
+            if (Math.abs(dj)===1 && di===0) zBlocked=true;
+          }
+        }
+        // An opening can fit the body while missing every regular lattice
+        // centre. At a blocked axis, add nearby lateral clearance lines from
+        // the actual obstacle faces. Sweep every extra edge just like a grid edge.
+        if (xBlocked || zBlocked) {
+          const reach=cell+radius;
+          const nearby=index.query(p[0]-reach,p[0]+reach,p[2]-reach,p[2]+reach,spend);
+          const walls=nearby.concat(moving).filter(b=>b.max[1]>p[1]+step+EPS && b.min[1]<p[1]+height-EPS);
+          spend(nearby.length+moving.length);
+          for (const axis of [0,2]) {
+            if (!(axis===2 ? xBlocked : zBlocked)) continue;
+            const lines=new Set();
+            for (const b of walls) {
+              const other=2-axis;
+              if (b.min[other]>p[other]+reach || b.max[other]<p[other]-reach) continue;
+              for (const value of [b.min[axis]-radius-1e-6,b.max[axis]+radius+1e-6]) {
+                const delta=Math.abs(value-p[axis]);
+                if (delta>1e-5 && delta<=cell) lines.add(value);
+              }
+            }
+            const distances=[...lines].sort((a,b)=>Math.abs(a-p[axis])-Math.abs(b-p[axis]));
+            for (const target of distances.slice(0,4)) {
+              const indexOnAxis=(target-start[axis])/cell;
+              if (axis===0) visit(indexOnAxis,node.j);
+              else visit(node.i,indexOnAxis);
+            }
+          }
         }
       }
       return failure("unreachable");

@@ -117,3 +117,28 @@ test("long corridors detour around an interior wall and never cross a sealed bar
   assert.notEqual(rejected.status,"ok");
   assert.deepEqual(rejected.points,[]);
 });
+test("an off-grid doorway with only four centimetres of spare width is discoverable",()=>{
+  const base=floor(-4,-4,4,4);
+  for (const rotate of [false,true]) {
+    const coords=([x,y,z]) => rotate ? [z,y,x] : [x,y,z];
+    const wall=(lo,hi)=>box(coords(lo),coords(hi));
+    const nav=createNavigation([base,wall([-.1,0,-4],[.1,3,.1]),wall([-.1,0,.7],[.1,3,4])]);
+    const route=assertRoute(nav,coords([-2,0,0]),coords([2,0,0]));
+    assert.ok(route.points.length>2);
+  }
+});
+test("three shipped worlds expose the same supported spawn height as the walking controller",()=>{
+  const fs=require("node:fs"), path=require("node:path");
+  const {MundoWorld,MundoGeometry,MundoWalk}=require("../server/room-runtime.cjs");
+  for (const name of ["Plaza_Brisa","Pista_Turismo","Patio_de_ceramica"]) {
+    const raw=fs.readFileSync(path.join(__dirname,"../examples",name+".mworld"));
+    const world=MundoWorld.decode(new Uint8Array(raw)), scene=MundoGeometry.flatten(world);
+    const nav=createNavigation(scene.objects);
+    const walker=new MundoWalk(scene.objects,false);
+    const [x,y,z]=walker.spawn;
+    for (let t=0;t<60;++t) walker.update(1/60,new Set(),0);
+    assert.equal(walker.grounded,true);
+    assert.ok(Math.abs(nav.project([x,y,z])[1]-walker.position[1])<1e-6);
+    assertRoute(nav,[x,y,z],[x+1,y,z]);
+  }
+});

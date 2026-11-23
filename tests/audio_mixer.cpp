@@ -152,16 +152,37 @@ int transfer(int argc,char** argv) {
     if(!world)throw std::runtime_error("invalid world");
     Mixer m(argc>=4 ? static_cast<unsigned>(std::stoul(argv[3])) : 48000);
     if(!m.set_world(*world))return 2;
-    if(argc==6) {
+    Clip clip;
+    if(argc==6 || argc==7) {
         std::ifstream file(argv[5],std::ios::binary);
         if(!file)throw std::runtime_error("clip unavailable");
         std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(file)),{});
-        auto clip=decode_clip(argv[4],raw);
-        if(!clip || !m.set_clip(argv[4],std::move(clip)))return 3;
+        clip=decode_clip(argv[4],raw);
+        if(!clip || !m.set_clip(argv[4],clip))return 3;
     }
     m.set_listener({},0);m.set_volume(1);
     std::vector<float> pcm(32768*2);
-    m.render(pcm);
+    if(argc==7) {
+        check(std::string_view(argv[6])=="live","unknown transfer mode");
+        std::size_t cursor=0;
+        auto render_to=[&](std::size_t end){
+            m.render(std::span(pcm).subspan(2*cursor,2*(end-cursor))); cursor=end;
+        };
+        // Exercise ordinary in-session control changes during a gain ramp and mid-clip.
+        auto scene=*read_scene(*world);
+        check(scene.count>=2,"live fixture is incomplete");
+        render_to(37);
+        m.set_listener({.3,-.1,2}, .81); render_to(888);
+        m.set_group_volume(Group::musica,.25); m.set_volume(.63); render_to(2801);
+        m.set_paused(true); render_to(3721); m.set_paused(false);
+        scene.sources[0].position={-2.,1.,0};
+        scene.sources[0].playback_rate=3.4; check(m.set_scene(scene),"live scene update");
+        for(std::size_t i=0;i<scene.count;++i)if(!scene.sources[i].loop)check(m.trigger(scene.sources[i].id),"live trigger");
+        render_to(5603); m.clear_clips(); render_to(9611);
+        check(m.set_clip(argv[4],clip),"live clip reinstall"); render_to(16381);
+        m.set_listener({9999,1,0},-1.3); render_to(24017);
+        m.set_listener({.2,0,0},2.2); render_to(32768);
+    } else m.render(pcm);
     std::ofstream out(output,std::ios::binary);
     out.write(reinterpret_cast<const char*>(pcm.data()),static_cast<std::streamsize>(pcm.size()*sizeof(float)));
     if(!out)throw std::runtime_error("PCM write failed");
@@ -171,7 +192,7 @@ int transfer(int argc,char** argv) {
 
 int main(int argc,char** argv) {
     try{
-        if(argc==3 || argc==4 || argc==6)return transfer(argc,argv);
+        if(argc==3 || argc==4 || argc==6 || argc==7)return transfer(argc,argv);
         check(argc==1,"usage: audio_mixer [world.mworld stereo.f32]");
         format();signals();extended_signals();clip_formats();
         std::cout<<"Native audio scene, continuity, spatial PCM, silence, and limiter passed\n";

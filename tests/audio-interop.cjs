@@ -20,19 +20,35 @@ function run(args, status = 0) {
   if (result.error) throw result.error;
   assert.equal(result.status,status,result.stderr);
 }
-function compare(world,rate,clip) {
+function compare(world,rate,clip,live=false) {
   fs.writeFileSync(worldPath, World.encode(world));
   const mix = DSP.create(rate);
-  mix.setSources(Audio.read(world));
+  const sources = Audio.read(world);
+  mix.setSources(sources);
   const args = [String(rate)];
   if (clip) {
     fs.writeFileSync(wav, clip.bytes);
     mix.setClip(clip.key, Clips.decode(clip.bytes));
     args.push(clip.key,wav);
   }
+  if (live) args.push("live");
   run(args);
   const left = new Float32Array(frames), right = new Float32Array(frames);
-  mix.render(left,right);
+  if (live) {
+    let cursor=0;
+    function to(end) {mix.render(left.subarray(cursor,end),right.subarray(cursor,end));cursor=end;}
+    to(37);
+    mix.setListener([.3,-.1,2],.81); to(888);
+    mix.setGroupVolume("musica",.25); mix.setVolume(.63); to(2801);
+    mix.setPaused(true); to(3721); mix.setPaused(false);
+    sources[0] = {...sources[0], position:[-2,1,0], playbackRate:3.4};
+    mix.setSources(sources);
+    for (const s of sources) if (!s.loop) assert.ok(mix.trigger(s.id));
+    to(5603); mix.clearClips(); to(9611);
+    mix.setClip(clip.key, Clips.decode(clip.bytes)); to(16381);
+    mix.setListener([9999,1,0],-1.3); to(24017);
+    mix.setListener([.2,0,0],2.2); to(frames);
+  } else mix.render(left,right);
   const native = fs.readFileSync(out);
   assert.equal(native.length,frames*8);
   let energy = 0, error = 0;
@@ -59,7 +75,10 @@ try {
     [clip.key,{playbackRate:.53,loop:false,spatial:"2d",group:"voces"}]]) {
     Audio.add(world,{...base,preset,...extras});
   }
-  for (const rate of [8000,44100,48000,192000]) compare(world,rate,clip);
+  for (const rate of [8000,44100,48000,192000]) {
+    compare(world,rate,clip);
+    compare(world,rate,clip,true);
+  }
   for (const preset of Audio.presets) {
     const single = World.empty();
     Audio.add(single,{...base,preset});

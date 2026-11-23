@@ -1714,6 +1714,7 @@ struct Client::Impl {
         input.action = CarAction::none;
         input.sampled = {};
         if (phase == Phase::ended) {
+            display.audio_clips.clear();
             active_origin.clear();
             active_invite.clear();
             if (meeting_waiting) display.message += " No se pudo confirmar tu posición final.";
@@ -1788,7 +1789,7 @@ struct Client::Impl {
             display.audio_clips.clear();
             session.audio.select(request.invite, request.proof, revision, std::move(keys));
         }
-        if (auto clips = session.audio.poll(); !clips.empty()) display.audio_clips = std::move(clips);
+        for (auto& clip : session.audio.poll()) display.audio_clips.push_back(std::move(clip));
         display.seat = session.admission->id;
         display.title = session.admission->name;
         last_snapshot = Clock::now();

@@ -3,7 +3,7 @@ project(MundoEngie VERSION 0.57.0 LANGUAGES C CXX)
 
 set(MUNDO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 include(cmake/Sources.cmake)
-add_library(mundo_core STATIC src/audio.cpp src/room_wire.cpp src/circuit.cpp src/room_view.cpp src/avatar.cpp src/vehicle.cpp src/zones.cpp src/zone_transition.cpp src/character.cpp src/world.cpp src/world_file.cpp src/world_revision.cpp src/edit_session.cpp src/runtime.cpp src/mesh.cpp src/creator_mesh.cpp src/adaptive.cpp
+add_library(mundo_core STATIC src/audio.cpp src/audio_settings.cpp src/room_wire.cpp src/circuit.cpp src/room_view.cpp src/avatar.cpp src/vehicle.cpp src/zones.cpp src/zone_transition.cpp src/character.cpp src/world.cpp src/world_file.cpp src/world_revision.cpp src/edit_session.cpp src/runtime.cpp src/mesh.cpp src/creator_mesh.cpp src/adaptive.cpp
     src/project_file.cpp src/project_history.cpp src/project_revision_file.cpp src/project_metadata.cpp src/project_meeting.cpp
     src/plugin_manifest.cpp src/plugin_inventory.cpp
     src/appearance.cpp src/device_settings.cpp src/private_file.cpp src/document_digest.cpp src/document_file.cpp src/visibility.cpp)
@@ -214,6 +214,13 @@ if(MUNDO_TEST_FOUNDATIONS)
         target_compile_options(mundo_audio_mixer_test PRIVATE /utf-8)
     endif()
     add_test(NAME audio_native_mixer COMMAND mundo_audio_mixer_test)
+    add_executable(mundo_audio_settings_test tests/audio-settings.cpp)
+    target_link_libraries(mundo_audio_settings_test PRIVATE Mundo::Core)
+    add_test(NAME audio_preferences COMMAND mundo_audio_settings_test)
+    add_executable(mundo_audio_transfer_retry_test tests/audio_transfer_retry.cpp)
+    target_include_directories(mundo_audio_transfer_retry_test PRIVATE "${MUNDO_ROOT}/apps/room")
+    target_link_libraries(mundo_audio_transfer_retry_test PRIVATE Mundo::Core)
+    add_test(NAME audio_transfer_retry COMMAND mundo_audio_transfer_retry_test)
     add_executable(mundo_audio_device_session_test tests/audio_device_session.cpp)
     target_include_directories(mundo_audio_device_session_test PRIVATE "${MUNDO_ROOT}/apps/room")
     target_link_libraries(mundo_audio_device_session_test PRIVATE Mundo::Core)
@@ -245,9 +252,23 @@ if(MUNDO_TEST_FOUNDATIONS)
             add_test(NAME project_exchange COMMAND "${MUNDO_TEST_NODE_EXECUTABLE}" "${MUNDO_ROOT}/tests/project-exchange.cjs" "$<TARGET_FILE:mundo-world>")
             add_test(NAME native_plugin_inventory COMMAND "${MUNDO_TEST_NODE_EXECUTABLE}" "${MUNDO_ROOT}/tests/native_plugin_inventory.cjs" "$<TARGET_FILE:mundo-world>")
         endif()
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPILING)
+            find_package(PkgConfig QUIET)
+            if(PkgConfig_FOUND)
+                pkg_check_modules(MUNDO_TEST_CURL QUIET IMPORTED_TARGET libcurl)
+                if(TARGET PkgConfig::MUNDO_TEST_CURL)
+                    add_executable(mundo_audio_native_room_test tests/audio_native_room.cpp
+                        apps/room/room_client.cpp apps/room/room_address.cpp apps/room/active_scene.cpp apps/room/sector_stream.cpp)
+                    target_include_directories(mundo_audio_native_room_test PRIVATE "${MUNDO_ROOT}/apps/room")
+                    target_link_libraries(mundo_audio_native_room_test PRIVATE Mundo::Core Threads::Threads PkgConfig::MUNDO_TEST_CURL)
+                    add_test(NAME audio_native_authenticated_room COMMAND "${MUNDO_TEST_NODE_EXECUTABLE}"
+                        "${MUNDO_ROOT}/tests/audio-native-room.cjs" "$<TARGET_FILE:mundo_audio_native_room_test>")
+                endif()
+            endif()
+        endif()
         add_test(NAME audio_native_interop COMMAND "${MUNDO_TEST_NODE_EXECUTABLE}" "${MUNDO_ROOT}/tests/audio-interop.cjs" "$<TARGET_FILE:mundo_audio_mixer_test>")
         add_test(NAME npc_native_wire_interop COMMAND "${MUNDO_TEST_NODE_EXECUTABLE}" "${MUNDO_ROOT}/tests/npc-wire-interop.cjs" "$<TARGET_FILE:mundo_npc_client_test>")
-        foreach(check IN ITEMS audio-dsp audio-scene audio-clips audio-room audio-plaza studio-audio player-audio
+        foreach(check IN ITEMS audio-dsp audio-scene audio-clips audio-room audio-plaza audio-project studio-audio player-audio
                 navigation-3d npc-navigation npc-simulation npc-room npc-continuity npc-traffic npc-host-map npc-client studio-npc room-player)
             add_test(NAME "${check}" COMMAND "${MUNDO_TEST_NODE_EXECUTABLE}" --test "${MUNDO_ROOT}/tests/${check}.cjs")
         endforeach()

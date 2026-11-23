@@ -29,6 +29,8 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
     private static native void deviceBudget(long h,long bytes,boolean lowMemory,boolean lowPower);
     private static native void frame(long h,double time,double hz);
     private static native boolean roomReady(long h);
+    private static native int[] getRoomLevels(long h);
+    private static native boolean saveRoomLevels(long h,int[] values);
     private static native boolean roomWantsAudio(long h);
     private static native void roomAudioAllowed(long h,boolean allowed);
     private RoomAudioFocus roomFocus;
@@ -119,7 +121,8 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
             if(style<0)notice("No se pudo cambiar la apariencia.");
             else styleButton.setText(style==1?"Turismo realista":"Turismo en bloques");
         });
-        button(actions,"Vídeo",this::settings);
+        button(actions,"Ajustes",()->new AlertDialog.Builder(this).setTitle("Ajustes")
+                .setItems(new String[]{"Vídeo","Sonido"},(dialog,index)->{if(index==0)settings();else audioSettings();}).show());
         layout.addView(actions,new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END));
         leap=new Button(this);leap.setText("Saltar");
         leap.setOnClickListener(v->{
@@ -486,6 +489,38 @@ public final class PlayerActivity extends Activity implements SurfaceHolder.Call
             new Thread(()->destroy(retired),"MUNDO room cleanup").start();
         }
         super.onDestroy();
+    }
+    private void audioSettings(){
+        if(!ready)return;
+        int[] levels=getRoomLevels(handle);
+        if(levels==null)return;
+        ScrollView scroll=new ScrollView(this);
+        LinearLayout panel=new LinearLayout(this);panel.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(panel);
+        CheckBox mute=new CheckBox(this);mute.setText("Silenciar partida");mute.setChecked(levels[0]!=0);
+        panel.addView(mute);
+        String[] channels={"General","Ambiente","Efectos","Música","Voces"};
+        for(int i=0;i<channels.length;i++){
+            final int index=i+1;
+            String channel=channels[i];
+            TextView label=new TextView(this);
+            label.setText(channel+" · "+levels[index]+" %");panel.addView(label);
+            SeekBar slider=new SeekBar(this);slider.setMax(100);
+            slider.setContentDescription(channel);slider.setProgress(levels[index]);
+            slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+                public void onProgressChanged(SeekBar bar,int progress,boolean user){
+                    levels[index]=progress;label.setText(channel+" · "+progress+" %");
+                }
+                public void onStartTrackingTouch(SeekBar bar){}
+                public void onStopTrackingTouch(SeekBar bar){}
+            });
+            panel.addView(slider);
+        }
+        new AlertDialog.Builder(this).setTitle("Sonido de MUNDO").setView(scroll)
+                .setNegativeButton("Cancelar",null).setPositiveButton("Guardar",(dialog,which)->{
+                    levels[0]=mute.isChecked()?1:0;
+                    if(handle==0 || !saveRoomLevels(handle,levels))notice("No se pudieron guardar los niveles.");
+                }).show();
     }
     private void settings(){
         if(!ready)return;

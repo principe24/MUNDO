@@ -16,6 +16,17 @@ unsigned movement_mask(double forward, double side) {
 }
 }
 
+bool Session::save_room_levels(const AudioLevels& levels) {
+    if (!audio_profile_) return false;
+    const auto result = audio_profile_->apply(levels);
+    if (result != SettingsResult::saved && result != SettingsResult::session_only) return false;
+    if (room_) {
+        room_->audio.set_levels(levels);
+        if (levels.muted || !levels.volume) room_->audio.suspend();
+    }
+    return true;
+}
+
 void Session::report_room(std::string message) {
     if (room_status_ == message) return;
     room_status_ = std::move(message);
@@ -68,6 +79,7 @@ bool Session::join_room(std::string_view link) {
     cancel_travel();
 #endif
     room_.emplace();
+    room_->audio.set_levels(room_levels());
     room_->look.third_person = local_look_.third_person;
     pause();
 #ifdef MUNDO_OWNER_VEHICLE_ART
@@ -253,7 +265,9 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
         camera.forward = {cp * std::sin(play.look.yaw), std::sin(play.look.pitch), -cp * std::cos(play.look.yaw)};
         show_self = play.look.third_person && play.actors.follow_pedestrian(camera, play.scene.terrain());
     }
-    if (room_audio_allowed_) play.audio.frame(*feet, std::atan2(camera.forward.x, -camera.forward.z));
+    const auto levels = room_levels();
+    if (room_audio_allowed_ && !levels.muted && levels.volume)
+        play.audio.frame(*feet, std::atan2(camera.forward.x, -camera.forward.z));
     const bool submitted=surface_->frame_with_peer(play.scene.world(), camera, caps, show_self ? play.actors.local_avatar() : nullptr,
                               play.actors.peer_avatar(),play.actors.vehicles(),play.actors.npc_avatars());
     if(submitted)play.presented=true;

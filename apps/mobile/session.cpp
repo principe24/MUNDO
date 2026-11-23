@@ -153,6 +153,12 @@ bool Session::take_zone_error(){
 bool Session::attach(void* window,GraphicsAPI backend,const std::filesystem::path& directory){
     detach();
     surface_=Surface::attach(window,backend,std::as_bytes(std::span(material)),directory);
+#ifdef MUNDO_MOBILE_ROOMS
+    if (surface_) {
+        audio_profile_.emplace(directory, DeviceFamily::mobile);
+        if (room_) room_->audio.set_levels(room_levels());
+    }
+#endif
 #ifdef MUNDO_OWNER_VEHICLE_ART
     art_loaded_=false;
     if(realistic_ && surface_){

@@ -1,6 +1,7 @@
 #import <UIKit/UIKit.h>
 #import <AVFoundation/AVFoundation.h>
 #import "seat_scanner.h"
+#import "audio_preferences.h"
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
 #include "session.hpp"
@@ -112,7 +113,7 @@
     _meeting.accessibilityIdentifier=@"mundo.room.meeting";
     _meeting.accessibilityLabel=@"Volver al punto de encuentro";
     _meeting.hidden=YES;
-    UIStackView *bar=[[UIStackView alloc] initWithArrangedSubviews:@[_vehicle, _room, _meeting, _camera, [self button:@"Vídeo" action:@selector(settings)]]];
+    UIStackView *bar=[[UIStackView alloc] initWithArrangedSubviews:@[_vehicle, _room, _meeting, _camera, [self button:@"Ajustes" action:@selector(chooseSettings)]]];
     bar.spacing=8;
     _pedal=[[DrivePedal alloc] initWithFrame:CGRectZero];
     _pedal.backgroundColor=UIColor.systemBackgroundColor;
@@ -539,6 +540,21 @@
     UIAlertController *a=[UIAlertController alertControllerWithTitle:@"MUNDO" message:message preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"Cerrar" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:a animated:YES completion:nil];
+}
+- (void)chooseSettings {
+    if(!_ready)return;
+    [self pauseInput];
+    UIAlertController *panel=[UIAlertController alertControllerWithTitle:@"Ajustes" message:nil preferredStyle:UIAlertControllerStyleAlert];
+    [panel addAction:[UIAlertAction actionWithTitle:@"Vídeo" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
+        [self settings];
+    }]];
+    [panel addAction:[UIAlertAction actionWithTitle:@"Sonido" style:UIAlertActionStyleDefault handler:^(UIAlertAction *action){
+        [self presentViewController:MundoAudioPreferences(self->_game.room_levels(), ^BOOL(mundo::AudioLevels levels){
+            return self->_game.save_room_levels(levels);
+        }) animated:YES completion:nil];
+    }]];
+    [panel addAction:[UIAlertAction actionWithTitle:@"Cancelar" style:UIAlertActionStyleCancel handler:nil]];
+    [self presentViewController:panel animated:YES completion:nil];
 }
 - (void)settings {
     if(!_ready)return;

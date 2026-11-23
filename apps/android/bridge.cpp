@@ -86,6 +86,25 @@ JNIEXPORT void JNICALL N(leaveRoom)(JNIEnv*,jclass,jlong h){if(h)host(h)->game.l
 JNIEXPORT void JNICALL N(setRoomActive)(JNIEnv*,jclass,jlong h,jboolean active){
     if(h)host(h)->game.set_room_active(active);
 }
+JNIEXPORT jintArray JNICALL N(getRoomLevels)(JNIEnv* env,jclass,jlong h){
+    if(!h)return nullptr;
+    const auto levels=host(h)->game.room_levels();
+    std::array<jint,6> values{levels.muted ? 1 : 0, static_cast<jint>(levels.volume)};
+    for(unsigned i=0;i<4;++i)values[i+2]=static_cast<jint>(levels.groups[i]);
+    const auto result=env->NewIntArray(values.size());
+    if(result)env->SetIntArrayRegion(result,0,values.size(),values.data());
+    return result;
+}
+JNIEXPORT jboolean JNICALL N(saveRoomLevels)(JNIEnv* env,jclass,jlong h,jintArray values){
+    if(!h || !values || env->GetArrayLength(values)!=6)return false;
+    std::array<jint,6> input{};
+    env->GetIntArrayRegion(values,0,input.size(),input.data());
+    if(env->ExceptionCheck() || input[0]<0 || input[0]>1)return false;
+    mundo::AudioLevels levels{};
+    levels.muted=input[0]!=0;levels.volume=static_cast<unsigned>(input[1]);
+    for(unsigned i=0;i<4;++i)levels.groups[i]=static_cast<unsigned>(input[i+2]);
+    return host(h)->game.save_room_levels(levels);
+}
 JNIEXPORT jboolean JNICALL N(roomWantsAudio)(JNIEnv*,jclass,jlong h){return h && host(h)->game.room_wants_audio();}
 JNIEXPORT void JNICALL N(roomAudioAllowed)(JNIEnv*,jclass,jlong h,jboolean allowed){
     if(h)host(h)->game.set_room_audio_allowed(allowed);

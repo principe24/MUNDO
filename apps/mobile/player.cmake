@@ -49,7 +49,7 @@ else()
         set(ios_executable "MUNDO")
         set(ios_display_name "MUNDO")
     endif()
-    add_executable(mundo_ios MACOSX_BUNDLE apps/ios/player.mm apps/ios/seat_scanner.mm)
+    add_executable(mundo_ios MACOSX_BUNDLE apps/ios/player.mm apps/ios/seat_scanner.mm apps/ios/audio_preferences.mm)
     target_compile_options(mundo_ios PRIVATE -fobjc-arc)
     set_target_properties(mundo_ios PROPERTIES
         OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON OUTPUT_NAME "${ios_executable}"

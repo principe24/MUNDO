@@ -46,8 +46,11 @@ public:
         if (!allowed && room_) room_->audio.suspend();
     }
     bool room_wants_audio() const {
-        return room_ready() && room_->audio.has_sources();
+        const auto levels = room_levels();
+        return room_ready() && !levels.muted && levels.volume && room_->audio.has_sources();
     }
+    AudioLevels room_levels() const { return audio_profile_ ? audio_profile_->settings() : AudioLevels{}; }
+    bool save_room_levels(const AudioLevels& levels);
     void trim_world_cache();
     void set_device_budget(std::uint64_t bytes, bool low_memory, bool low_power) {
         if (low_memory) trim_world_cache();
@@ -137,6 +140,7 @@ private:
     std::optional<RoomScene> room_;
     std::string room_status_;
     unsigned room_status_revision_{};
+    std::optional<DeviceAudioProfile> audio_profile_;
     bool room_active_{true}, room_audio_allowed_{true};
 #endif
     std::filesystem::path storage_;

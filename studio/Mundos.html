@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="es"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; connect-src 'none'; img-src data:; base-uri 'none'">
+  <title>Editor de mundos · MUNDO Studio</title><link rel="stylesheet" href="../web/interface.css">
+</head><body class="editor">
+  <header class="bar"><strong class="brand">MUNDO <span>Studio</span></strong><nav><a href="Mundo_Studio.html">Taller de carros</a><button type="button" id="play">Preparar sala del borrador</button></nav></header>
+  <main class="workbench">
+    <section class="stage" aria-label="Escena tridimensional">
+      <canvas id="viewport" tabindex="0" aria-label="Arrastra para girar la cámara. Toca una pieza para seleccionarla."></canvas>
+      <div class="overlay top"><div><p class="eyebrow">Editor de mundos</p><h1 id="worldTitle">Plaza Brisa</h1></div><span id="stats" class="metric" aria-label="Rendimiento del visor"></span></div>
+      <div class="overlay bottom"><div class="group"><button id="less" aria-label="Alejar cámara">−</button><button id="more" aria-label="Acercar cámara">+</button><button id="focus">Centrar selección</button></div></div>
+    </section>
+    <aside class="panel">
+      <section><label for="worldName">Nombre del archivo</label><input id="worldName" value="Plaza Brisa" maxlength="64">
+        <div class="actions"><button id="new">Nuevo</button><button id="open">Abrir</button><button class="primary" id="save">Guardar ↓</button></div>
+        <button type="button" id="potteryCourtyard" class="full">Crear desde Patio de cerámica</button>
+        <button type="button" id="brumaTrack" class="full">Crear pista con Bruma</button>
+        <button id="zoneExport" class="full">Exportar partida por zonas</button>
+        <button type="button" id="zoneAnalyze" class="full">Analizar carga por zonas</button>
+        <p id="zoneStatus" role="status"></p>
+        <div id="zoneResult" hidden>
+          <dl class="zone-report">
+            <dt>Entrada analizada</dt><dd id="zoneFocus"></dd>
+            <dt>Móvil</dt><dd id="zoneMobile"></dd>
+            <dt>PC</dt><dd id="zonePC"></dd>
+            <dt>Paquete completo</dt><dd id="zoneTotal"></dd>
+            <dt>Datos globales</dt><dd id="zoneGlobal"></dd>
+            <dt>SHA-256 del paquete</dt><dd><code id="zoneHash"></code></dd>
+          </dl>
+          <button type="button" id="zoneManifest" class="full">Descargar inventario JSON</button>
+          <fieldset id="entryInspector" class="meeting">
+            <legend>Terreno de entrada de la sala</legend>
+            <label for="entryProfile">Dispositivo del jugador</label>
+            <select id="entryProfile"><option value="mobile">Móvil</option><option value="pc">PC</option></select>
+            <p>Se usa la entrada del borrador. La posición asignada a cada plaza puede cambiar la zona recibida.</p>
+            <p id="entryStatus" role="status"></p>
+            <canvas id="entryMap" width="512" height="512" hidden role="img" aria-label="Mapa en planta del terreno de entrada" aria-describedby="entryCaption zoneFocus"></canvas>
+            <p id="entryCaption"></p>
+            <button type="button" class="full" id="entryExport" disabled>Descargar vista de entrada (.mworld)</button>
+          </fieldset>
+          <details id="districtInspector" class="meeting">
+            <summary>Comparar barrios durante el recorrido</summary>
+            <label for="districtPoint">Punto del mundo</label>
+            <select id="districtPoint"></select>
+            <fieldset id="districtCoordinates" hidden>
+              <legend>Posición en metros</legend>
+              <label for="districtX">X</label><input id="districtX" type="number" step="any" required>
+              <label for="districtZ">Z</label><input id="districtZ" type="number" step="any" required>
+              <button type="button" id="districtLocate">Inspeccionar posición</button>
+            </fieldset>
+            <p id="districtMessage" role="status"></p>
+            <table id="districtReport" hidden>
+              <caption>Entidades por perfil con el jugador detenido</caption>
+              <thead><tr><th scope="col">Conjunto</th><th scope="col">Móvil</th><th scope="col">PC</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <fieldset>
+              <legend>Descarga de la sala por sectores (MSP1)</legend>
+              <label for="districtNext">Parada de destino</label>
+              <select id="districtNext"></select>
+              <fieldset id="districtNextCoordinates" hidden>
+                <legend>Destino en metros</legend>
+                <label for="districtNextX">X</label><input id="districtNextX" type="number" step="any" required>
+                <label for="districtNextZ">Z</label><input id="districtNextZ" type="number" step="any" required>
+                <button type="button" id="districtNextLocate">Calcular tramo</button>
+              </fieldset>
+              <p id="districtTransferMessage" role="status"></p>
+              <table id="districtTransfer" hidden>
+                <caption>Contenido que se debe verificar</caption>
+                <thead><tr><th scope="col">Carga</th><th scope="col">Móvil</th><th scope="col">PC</th></tr></thead>
+                <tbody></tbody>
+              </table>
+              <p>Cada ventana admite hasta 4 MiB en móvil y 8 MiB en PC. Solo al entrar debe ahorrar al menos un 25 % frente al mundo completo.</p>
+              <p>Se calcula una llegada sin caché y un salto directo entre dos paradas de la misma revisión. Se cuentan los documentos del mundo con sus cabeceras internas. Manifiestos, cabeceras de transporte, reintentos y latencia quedan fuera.</p>
+            </fieldset>
+            <fieldset id="aheadInspector">
+              <legend>Precarga del turismo en el tramo</legend>
+              <p>Elige arriba el origen y el destino. La estimación usa un tramo recto, los tamaños de los archivos y una ventana confirmada en la posición elegida. Los tiempos de descarga y la conducción real se comprueban en partida.</p>
+              <label for="aheadSpeed">Velocidad del turismo (−4 a 14 m/s)</label>
+              <input id="aheadSpeed" type="number" min="-4" max="14" step="any" value="8">
+              <p id="aheadAvailability" role="status"></p>
+              <div id="aheadControls" hidden>
+                <label for="aheadDistance">Posición desde el origen (m)</label>
+                <input id="aheadDistance" type="range" min="0" max="1" step="any" value="0">
+                <label for="aheadMeters">Distancia exacta (m)</label>
+                <input id="aheadMeters" type="number" min="0" step="any" value="0">
+                <div class="actions">
+                  <button type="button" id="aheadPrevious">Antes del cruce anterior</button>
+                  <button type="button" id="aheadNext">Antes del cruce siguiente</button>
+                </div>
+                <p id="aheadPosition" role="status"></p>
+                <table id="aheadReport" hidden>
+                  <caption>Estimación del salto directo a la celda prevista</caption>
+                  <thead><tr><th scope="col">Contenido</th><th scope="col">Móvil</th><th scope="col">PC</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+                <div id="aheadDetail" hidden>
+                  <label for="aheadProfile">Perfil del mapa y del detalle</label>
+                  <select id="aheadProfile"><option value="mobile">Móvil</option><option value="pc">PC</option></select>
+                  <fieldset id="aheadDiagonal" hidden>
+                    <legend>Alternativas de un cruce diagonal</legend>
+                    <p>Cada columna muestra los bytes nuevos que necesita esa ventana y los que podría aportar la misma oferta de precarga. Las rutas por etapas pueden necesitar terreno adicional en la celda intermedia.</p>
+                    <table id="aheadStageReport">
+                      <caption id="aheadStageCaption">Demanda y precarga aprovechable por etapa</caption>
+                      <thead><tr><th scope="col">Ruta</th><th scope="col">Intermedio</th><th scope="col">Destino</th></tr></thead>
+                      <tbody></tbody>
+                    </table>
+                    <label for="aheadVia">Ruta en el mapa y en el detalle</label>
+                    <select id="aheadVia"><option value="">Salto directo</option><option value="x">X primero</option><option value="z">Z primero</option></select>
+                  </fieldset>
+                  <p id="aheadMapText"></p>
+                  <canvas id="aheadMap" width="512" height="512" role="img" aria-label="Precarga del próximo barrio" aria-describedby="aheadMapText aheadCellCaption"></canvas>
+                  <table id="aheadCells">
+                    <caption id="aheadCellCaption">Celdas adelantables en orden de prioridad</caption>
+                    <thead><tr><th scope="col">Orden · (X, Z)</th><th scope="col">Contenido</th><th scope="col">Posible apoyo</th></tr></thead>
+                    <tbody></tbody>
+                  </table>
+                  <p>Un sector tiene posible apoyo si alguna superficie está a 3,5 cm o menos de la altura de la base del turismo. La sala comprueba el contacto de las cuatro ruedas al conducir.</p>
+                </div>
+              </div>
+            </fieldset>
+            <fieldset id="crossingCompare">
+              <legend>Cruces con mayor carga del circuito</legend>
+              <p>El recorrido va desde la entrada hasta las puertas en orden. Cada tramo recto parte de una entrada propia sin caché. En cada punto se supone confirmada la ventana actual y completada la precarga prevista. Se inspeccionan hasta 256 posiciones. En caso de empate se muestra el primer cruce.</p>
+              <button type="button" id="compareGates" disabled>Comparar cruces de todas las puertas</button>
+              <p id="compareStatus" role="status"></p>
+              <table id="compareReport" hidden>
+                <caption>Carga pendiente al cruzar, por perfil</caption>
+                <thead><tr><th scope="col">Perfil</th><th scope="col">Mayor carga por sectores</th><th scope="col">Cruces con archivo completo</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </fieldset>
+          </details>
+        </div>
+        <details id="timingInspector" class="meeting">
+          <summary>Comparar vueltas y tramos del circuito</summary>
+          <label for="timingFile">Informe de parciales del anfitrión (.json)</label>
+          <input type="file" id="timingFile" accept=".json,application/json">
+          <label for="timingOther">Segundo informe de la misma publicación (opcional)</label>
+          <input type="file" id="timingOther" accept=".json,application/json" disabled>
+          <div class="actions"><button id="timingClear" type="button">Quitar informes</button>
+            <button id="timingRemoveOther" type="button" disabled>Quitar segundo informe</button></div>
+          <p id="timingNotice" role="status"></p>
+          <div id="timingData" hidden>
+            <p id="timingIdentity"></p>
+            <label>Vuelta que quieres analizar<select id="timingLap"></select></label>
+            <label>Comparar con<select id="timingRef"></select></label>
+            <div class="timing-scroll" role="region" aria-label="Tiempos por puerta" tabindex="0">
+              <table id="timingTable"><caption>Tiempo por puerta y diferencia. Un valor positivo indica tiempo perdido.</caption>
+                <thead><tr><th scope="col">Puerta</th><th scope="col">Acumulado</th><th scope="col">Referencia</th>
+                  <th scope="col">Diferencia total</th><th scope="col">Tramo</th><th scope="col">Tramo de referencia</th>
+                  <th scope="col">Diferencia de tramo</th></tr></thead><tbody></tbody></table>
+            </div>
+            <p id="timingCoverage"></p>
+            <button id="timingPeak" type="button">Seleccionar tramo con mayor pérdida</button>
+            <label>Puerta de llegada<select id="timingGate"></select></label>
+            <div class="actions"><button id="timingLocate" type="button">Localizar puerta en el borrador</button>
+              <button id="timingPractice" type="button">Preparar práctica del tramo</button>
+              <button id="timingZones" type="button">Ver carga de terreno del tramo</button></div>
+          </div>
+        </details>
+        <details id="usageInspector" class="meeting">
+          <summary>Registro de precarga de la partida</summary>
+          <label for="usageFile">Abrir el registro JSON descargado en el panel del anfitrión</label>
+          <input type="file" id="usageFile" accept=".json,application/json">
+          <button type="button" id="usageClear">Quitar registro</button>
+          <p id="usageStatus" role="status"></p>
+          <div id="usageControls" hidden>
+            <fieldset>
+              <legend>Filtrar ofertas</legend>
+              <label>Revisión del mundo<select id="usageRevision"></select></label>
+              <label>Época de la partida<select id="usageEpoch"></select></label>
+              <label>Plaza del jugador<select id="usageSeat"></select></label>
+              <label>Perfil del dispositivo<select id="usageProfile"></select></label>
+              <label>Estado de la oferta<select id="usageState"></select></label>
+              <label>Instalación intermedia<select id="usageRouteKind"></select></label>
+            </fieldset>
+            <table id="usageSummary">
+              <caption>Resumen de las ofertas seleccionadas</caption>
+              <thead><tr><th scope="col">Métrica</th><th scope="col">Móvil</th><th scope="col">PC</th></tr></thead><tbody></tbody>
+            </table>
+            <button type="button" id="usagePeak" class="full">Ver el cruce con más bytes previstos sin aprovechar</button>
+            <p id="usagePeakStatus" role="status"></p>
+            <label>Inspeccionar una oferta<select id="usageEntry"></select></label>
+            <p id="usageEntryText"></p>
+            <table id="usageDetail">
+              <caption>Mediciones y estimación del borrador</caption>
+              <thead><tr><th scope="col">Origen</th><th scope="col">Dato</th><th scope="col">Bytes o valor</th></tr></thead><tbody></tbody>
+            </table>
+            <details id="usagePeers" hidden>
+              <summary>Comparar móvil y PC en este mismo cruce</summary>
+              <p>Incluye las dos plazas y las pasadas confirmadas de esta revisión, turismo, época y sentido, con el mismo paso intermedio declarado. En los informes antiguos solo se conoce el total. Cada perfil puede tener un número distinto de pasadas.</p>
+              <table id="usagePeerTable"><caption>Pasadas registradas por dispositivo</caption>
+                <thead><tr><th scope="col">Métrica</th><th scope="col">Móvil</th><th scope="col">PC</th></tr></thead><tbody></tbody>
+              </table>
+            </details>
+            <canvas id="usageMap" width="384" height="320" hidden role="img" aria-label="Ventana de la oferta y celdas previstas en el borrador" aria-describedby="usageEntryText"></canvas>
+            <button type="button" id="usageAnalyze" class="full">Comparar con el borrador actual</button>
+          </div>
+        </details>
+        <button id="shareWorld" class="full" hidden>Compartir archivo .mworld</button>
+        <input type="file" id="inputFile" accept=".mworld,.mroom,.mroom3d" hidden>
+      </section>
+      <section><details id="navPanel"><summary>Personajes y rutas a pie</summary>
+        <fieldset><legend>Posición en la escena</legend>
+          <div class="actions"><label>X <input id="navX" type="number" step="any" value="0"></label><label>Y <input id="navY" type="number" step="any" value="0"></label><label>Z <input id="navZ" type="number" step="any" value="0"></label></div>
+          <button type="button" id="navPick" aria-pressed="false">Elegir posición sobre el suelo</button>
+        </fieldset>
+        <fieldset><legend>Ruta compartida</legend>
+          <label for="navRoute">Ruta</label><select id="navRoute"></select>
+          <label for="navRouteName">Nombre de la ruta nueva</label><input id="navRouteName" maxlength="32" value="Paseo">
+          <button type="button" id="navCreateRoute">Crear ruta con el primer punto aquí</button>
+          <label for="navPoint">Puntos en orden</label><select id="navPoint"></select>
+          <div class="actions"><button type="button" id="navAppend">Añadir aquí</button><button type="button" id="navMove">Mover punto aquí</button></div>
+          <div class="actions"><button type="button" id="navUp">Adelantar punto</button><button type="button" id="navDown">Atrasar punto</button><button type="button" id="navDeletePoint">Quitar punto</button></div>
+          <button type="button" id="navDeleteRoute">Quitar ruta</button>
+        </fieldset>
+        <fieldset><legend>Personaje de la sala</legend>
+          <label for="navNpc">Personaje</label><select id="navNpc"></select>
+          <label for="navNpcName">Nombre</label><input id="navNpcName" maxlength="32" value="Guía">
+          <label for="navMode">Conducta</label><select id="navMode"><option value="patrol">Recorrer la ruta y volver al origen</option><option value="follow">Seguir a un jugador cercano y volver al origen</option></select>
+          <label for="navSpeed">Velocidad (m/s)</label><input id="navSpeed" type="number" min="0.25" max="6" step="0.01" value="2">
+          <label for="navWait">Espera en cada parada (s)</label><input id="navWait" type="number" min="0" max="30" step="0.001" value="1">
+          <button type="button" id="navCreateNpc">Crear personaje en esta posición</button>
+          <div class="actions"><button type="button" id="navUpdateNpc">Guardar ruta y conducta</button><button type="button" id="navMoveNpc">Mover origen aquí</button><button type="button" id="navDeleteNpc">Quitar personaje</button></div>
+        </fieldset>
+        <p id="navStatus" role="status" aria-live="polite"></p>
+      </details></section>
+      <section><h2>Proyecto de juego</h2>
+        <fieldset id="projectControls"><label for="projectName">Nombre del proyecto</label>
+          <input id="projectName" maxlength="128" value="Mi juego">
+          <label for="projectWorlds">Mundos del proyecto</label><select id="projectWorlds"></select>
+          <div class="actions"><button id="projectDraft">Añadir borrador</button><button id="projectRelease">Añadir publicación elegida</button></div>
+          <div class="actions"><button id="projectEdit">Editar mundo elegido</button><button id="projectUpdate">Sustituir con el borrador</button></div>
+          <div class="actions"><button id="projectStart">Hacer inicial</button><button id="projectRemove">Quitar del proyecto</button></div>
+          <p>El proyecto guarda copias. Después de editar un mundo, usa «Sustituir con el borrador» para incluir los cambios.</p>
+          <fieldset><legend>Portales a pie</legend>
+            <button type="button" class="full" id="placePortal" aria-pressed="false">Colocar baldosa en el suelo</button>
+            <p>Coloca una baldosa en el borrador y añádelo al proyecto, o sustituye su copia. Después elige el mundo de origen en la lista de arriba.</p>
+            <label for="portalFilter" id="portalFilterLabel" hidden>Buscar baldosa por nombre o ID</label><input id="portalFilter" type="search" hidden>
+            <label for="portalTile">Baldosa del mundo elegido</label><select id="portalTile"></select>
+            <label for="portalTarget">Mundo de destino</label><select id="portalTarget"></select>
+            <div class="actions"><button id="portalLink">Guardar destino</button><button id="portalUnlink">Quitar enlace</button></div>
+          </fieldset>
+          <fieldset><legend>Plugins del proyecto</legend>
+            <div class="actions"><button type="button" id="projectPluginCapture" disabled>Fijar los plugins activos del catálogo</button><button type="button" id="projectPluginClear" disabled>Usar el catálogo del navegador</button></div>
+            <p id="projectPluginStatus" role="status" aria-live="polite"></p>
+          </fieldset>
+          <div class="actions"><button id="projectOpen">Abrir proyecto</button><button id="projectSave">Guardar proyecto</button><button id="projectShare" hidden>Compartir proyecto…</button></div>
+          <button type="button" id="projectPlay" hidden>Preparar sala del proyecto</button>
+          <a id="projectHostedPractice" href="https://mundo-lonja-salida-lanzada.kyjhv6fcgk.chatgpt.site/"
+             data-room-sha256="44a13f6542cb1434058f31645e5de6f400d0283543e494b11a71081d0acd0085"
+             target="_blank" rel="noopener noreferrer" hidden>Jugar esta práctica de la Lonja en línea</a>
+          <a href="https://mundo-lonja-salida-lanzada.kyjhv6fcgk.chatgpt.site/anden/"
+             data-room-sha256="b814d6496dce13ddeb5cf8ecb3701a4b3bf3b56f416aff346bcfb5eb6c311217"
+             target="_blank" rel="noopener noreferrer" hidden>Jugar desde el Andén en línea</a>
+          <input id="projectFile" type="file" accept=".mproject" hidden>
+        </fieldset><p id="projectStatus" role="status"></p>
+      </section>
+      <section aria-labelledby="circuitTitle"><h2 id="circuitTitle">Circuito del borrador</h2>
+        <label for="circuitList">Orden de paso del turismo</label><select id="circuitList"></select>
+        <div class="actions"><button type="button" id="circuitEarlier">Adelantar</button><button type="button" id="circuitLater">Atrasar</button>
+          <button type="button" id="circuitLocate">Localizar</button></div>
+        <p id="circuitSegment"></p>
+        <div class="actions">
+          <button type="button" id="circuitInsert" aria-describedby="circuitSegment">Insertar puerta en el tramo siguiente</button>
+          <button type="button" id="circuitMarkStep" aria-describedby="circuitSegment" aria-pressed="false">Marcar paso en el suelo</button>
+        </div>
+        <form id="circuitForm">
+          <label for="gateLabel">Nombre de la puerta</label><input id="gateLabel" maxlength="48" value="Salida" required>
+          <div class="xyz"><label>X (m)<input id="gateX" type="number" step="any" value="0" required></label>
+            <label>Suelo Y (m)<input id="gateY" type="number" step="any" value="0" required></label>
+            <label>Z (m)<input id="gateZ" type="number" step="any" value="0" required></label></div>
+          <div class="xyz"><label>Ancho (m)<input id="gateWidth" type="number" min="2" max="48" step="any" value="5" required></label>
+            <label>Alto (m)<input id="gateHeight" type="number" min="2" max="20" step="any" value="3" required></label>
+            <label>Rumbo (°)<input id="gateBearing" type="number" step="any" value="0" required></label></div>
+          <p>La señal sobre el arco apunta en el sentido de paso. 0° mira hacia −Z y 90° hacia +X.</p>
+          <div class="actions"><button type="button" id="circuitPlace" aria-pressed="false">Crear sobre el suelo</button>
+            <button type="button" id="circuitAdd">Crear en coordenadas</button></div>
+          <div class="actions"><button type="submit" id="circuitApply">Aplicar a la elegida</button>
+            <button type="button" id="circuitRelocate" aria-pressed="false">Mover sobre el suelo</button>
+            <button type="button" id="circuitDuplicate">Duplicar puerta</button>
+            <button type="button" id="circuitDelete">Quitar puerta</button></div>
+        </form>
+        <details id="circuitPractice"><summary>Sala de práctica por puertas</summary>
+          <p id="draftStartMode"></p>
+          <p>Elige la primera y la última puerta. Las demás conservan sus arcos como decoración. El punto de encuentro se conserva en la copia.</p>
+          <label for="practiceFirst">Primera puerta cronometrada</label><select id="practiceFirst"></select>
+          <label for="practiceLast">Última puerta cronometrada</label><select id="practiceLast"></select>
+          <label for="practiceStartMode">Inicio del cronómetro en la copia</label>
+          <select id="practiceStartMode"><option value="movement">Al empezar a mover el turismo</option><option value="flying">Al cruzar la primera puerta (salida lanzada)</option></select>
+          <fieldset class="meeting"><legend>Parrilla del turismo</legend>
+            <p>Elige dónde aparece el carro y hacia dónde mira. El rumbo 0° apunta hacia −Z y 90° hacia +X.</p>
+            <form id="gridForm">
+              <div class="xyz"><label>X (m)<input id="gridX" type="number" min="-1000000" max="1000000" step="any" required></label>
+                <label>Suelo Y (m)<input id="gridY" type="number" min="-1000000" max="1000000" step="any" required></label>
+                <label>Z (m)<input id="gridZ" type="number" min="-1000000" max="1000000" step="any" required></label></div>
+              <label for="gridBearing">Rumbo del carro (°)</label><input id="gridBearing" type="number" step="any" required>
+              <div class="actions"><button type="button" id="gridPlace" aria-pressed="false">Marcar la salida en el suelo</button>
+                <button type="button" id="gridAim">Apuntar a la primera puerta</button>
+                <button type="submit" id="gridApply">Guardar parrilla</button></div>
+            </form>
+            <div class="actions"><button type="button" id="gridLocate">Localizar salida</button>
+              <button type="button" id="gridClear">Usar salida original</button></div>
+            <p id="gridStatus" role="status"></p>
+          </fieldset>
+          <p>El archivo .mroom es una publicación privada independiente, con su propia marca. Puedes abrirlo en el panel del anfitrión.</p>
+          <button type="button" id="practiceExport" disabled>Descargar sala de práctica</button>
+          <p id="practiceStatus" role="status"></p>
+        </details>
+        <p>Para llevar la pista a la sala, publica el borrador o sustituye su copia en el proyecto.</p>
+      </section>
+      <section><h2>Publicaciones privadas</h2>
+        <label for="experienceLook">Personaje recomendado para esta experiencia</label>
+        <select id="experienceLook" aria-describedby="experienceLookHint">
+          <option value="">Sin preferencia</option><option value="ines-bajamar-1">Inés · mecánica de Bajamar</option>
+        </select>
+        <p id="experienceLookHint">La publicación guarda tu elección. El anfitrión decide si comparte el modelo con los jugadores.</p>
+        <label for="vehicleChoice">Turismo compartido del borrador</label><select id="vehicleChoice"></select>
+        <button id="locateVehicle" type="button" class="full" disabled>Localizar turismo en la escena</button>
+        <p id="missingVehicle" role="status" hidden>El turismo elegido ya no está disponible. Selecciona otro o usa Automático antes de publicar.</p>
+        <fieldset class="meeting"><legend>Punto de encuentro</legend>
+          <button id="markMeeting" type="button" class="full" aria-pressed="false">Marcar sobre el suelo</button>
+          <div id="meetingTools"></div>
+          <details><summary>Escribir coordenadas</summary>
+            <form id="meetingForm">
+              <div class="xyz"><label>X (m)<input id="meetingX" type="number" step="any" min="-1000000" max="1000000" required></label>
+                <label>Y (m)<input id="meetingY" type="number" step="any" min="-1000000" max="1000000" required></label>
+                <label>Z (m)<input id="meetingZ" type="number" step="any" min="-1000000" max="1000000" required></label></div>
+              <button type="submit" class="full">Aplicar punto</button>
+            </form>
+          </details>
+          <div class="actions"><button id="locateMeeting" type="button" disabled>Localizar</button>
+            <button id="autoMeeting" type="button" disabled>Volver a automático</button></div>
+          <p id="meetingStatus" role="status"></p>
+        </fieldset>
+        <button id="publish" class="full">Publicar borrador en este dispositivo</button>
+        <label for="releases">Versiones guardadas</label><select id="releases" disabled></select>
+        <div class="actions"><button id="restoreRelease" disabled>Recuperar en el editor</button>
+          <button id="exportRelease" disabled>Descargar .mworld</button></div>
+        <button id="roomExport" class="full" disabled>Exportar sala privada (.mroom)</button>
+        <button type="button" id="modelRoomExport" class="full" hidden>Exportar sala con sus modelos (.mroom3d)</button>
+        <p id="releaseCircuit"></p><p id="roomVehicle" aria-live="polite"></p><p id="releaseMeeting"></p><p id="releaseLook"></p>
+        <button type="button" id="playRelease" hidden>Preparar sala de esta versión</button>
+        <p id="releaseStatus" role="status"></p>
+      </section>
+      <section><div class="line"><h2>Escena</h2><output id="count"></output></div>
+        <label class="sr" for="search">Buscar pieza o identificador</label><input id="search" type="search" placeholder="Buscar pieza o ID">
+        <label class="sr" for="objects">Jerarquía del mundo</label><select id="objects" size="6"></select>
+        <label for="catalogObject">Modelos 3D</label>
+        <select id="catalogObject"><option value="planter">Maceta de terracota</option><option value="light">Baliza de paseo</option><option value="bruma">Cupé Bruma · dos plazas</option><optgroup id="creatorOptions" label="Mis modelos"></optgroup></select>
+        <div class="actions"><button type="button" id="placeCatalogObject" aria-pressed="false">Colocar en una superficie</button><button type="button" id="addCatalogObject">Añadir al centro</button></div>
+        <label for="creatorFile">Importar modelo propio (.obj)</label>
+        <input id="creatorFile" type="file" accept=".obj" aria-describedby="creatorFileHelp">
+        <p id="creatorFileHelp">Malla estática en metros, con Y hacia arriba. Hasta 6 MiB y 60 000 triángulos. El archivo del mundo guarda la referencia. Para trasladar la geometría, exporta la publicación con sus modelos o conserva el OBJ.</p>
+        <div class="actions"><button type="button" id="creatorReload">Actualizar mis modelos</button><button type="button" id="creatorSample" hidden>Importar lámpara de muestra</button></div>
+        <p id="creatorStatus" role="status"></p><p id="creatorMissing" role="status"></p>
+        <p id="creatorDimensions"></p>
+        <details id="creatorInspector" hidden><summary>Inspeccionar la malla</summary>
+          <label for="creatorSurfaceLayout">Distribución de superficies del OBJ</label><select id="creatorSurfaceLayout"></select>
+          <label for="creatorSurfaceRange">Superficies y triángulos</label><select id="creatorSurfaceRange"></select>
+          <label for="creatorAxis">Proyección</label><select id="creatorAxis"><option value="front">Frontal</option><option value="side">Lateral</option><option value="top">Superior</option></select>
+          <canvas id="creatorWireframe" width="420" height="300" role="img" aria-label="Triángulos del modelo en la proyección elegida" aria-describedby="creatorDimensions creatorWireStatus" hidden></canvas>
+          <p id="creatorWireStatus" role="status"></p>
+        </details>
+        <details><summary>Carrocería privada de Bruma</summary>
+          <label for="brumaFile">Cargar catálogo local (.mlook)</label><input id="brumaFile" type="file" accept=".mlook">
+          <p id="brumaArtStatus" role="status">El editor muestra el modelo básico hasta cargar el catálogo del propietario.</p>
+        </details>
+        <div class="actions"><button data-shape="1">+ Bloque</button><button data-shape="2">+ Cilindro</button><button data-shape="3">+ Esfera</button></div>
+        <button class="full" id="place">Insertar modelo .mworld</button>
+        <input type="file" id="inputModel" accept=".mworld" hidden>
+      </section>
+      <section><h2>Propiedades</h2><form id="props"><fieldset id="fields" disabled>
+        <label for="pieceName">Nombre de la pieza</label><input id="pieceName" maxlength="95" required>
+        <label for="parent">ID del grupo superior</label><input id="parent" inputmode="numeric" list="parents" pattern="[0-9]+" required><datalist id="parents"></datalist>
+        <div class="xyz" id="position"><span>Posición (m)</span></div>
+        <div class="xyz" id="sizes"><span>Escala</span></div>
+        <label class="paint">Color <input id="color" type="color"></label>
+        <div class="actions"><button type="button" id="turn">Girar 15°</button><button type="submit" class="primary">Aplicar</button></div>
+        <div class="actions"><button type="button" id="copy">Duplicar</button><button type="button" id="remove">Quitar</button></div>
+      </fieldset></form>
+        <fieldset id="creatorMaterialFields" hidden disabled>
+          <legend>Acabado por superficie de esta instancia</legend>
+          <label for="creatorMaterialLayout">Distribución del OBJ</label><select id="creatorMaterialLayout"></select>
+          <label for="creatorMaterialSurface">Superficie</label><select id="creatorMaterialSurface"></select>
+          <label><input id="creatorMaterialUseColor" type="checkbox"> Ajustar el color de esta superficie</label>
+          <label for="creatorMaterialColor">Color base</label><input id="creatorMaterialColor" type="color" disabled>
+          <label><input id="creatorMaterialUseRough" type="checkbox"> Ajustar la rugosidad de esta superficie</label>
+          <label for="creatorMaterialRough">Rugosidad (0 a 1)</label><input id="creatorMaterialRough" type="number" min="0" max="1" step="any" disabled>
+          <div class="actions"><button type="button" id="creatorMaterialApply">Aplicar acabado</button><button type="button" id="creatorMaterialInherit">Heredar ambas propiedades</button></div>
+          <button type="button" id="creatorMaterialReset">Restablecer todas las superficies de la instancia</button>
+          <p>Las propiedades sin ajuste heredan el material de la instancia. Para conservar los acabados, actualiza el borrador del proyecto y guarda el .mproject.</p>
+          <p id="creatorMaterialStatus" role="status"></p>
+        </fieldset>
+        <details id="pluginManager"><summary>Plugins locales</summary>
+          <label for="pluginFiles">Instalar manifiestos (.mplugin)</label>
+          <input id="pluginFiles" type="file" accept=".mplugin,application/json" multiple disabled>
+          <label for="pluginSelect">Plugins instalados</label><select id="pluginSelect" disabled></select>
+          <p id="pluginDeps"></p>
+          <div class="actions"><button type="button" id="pluginEnable" disabled>Activar</button><button type="button" id="pluginDisable" disabled>Desactivar</button></div>
+          <div class="actions"><button type="button" id="pluginExport" disabled>Descargar manifiesto</button><button type="button" id="pluginRemove" disabled>Desinstalar</button></div>
+          <label for="pluginRevision">Versiones guardadas del plugin</label>
+          <select id="pluginRevision" disabled></select>
+          <button type="button" id="pluginReviewVersion" disabled>Revisar cambio de versión preferida</button>
+          <fieldset id="pluginReviewBox" hidden>
+            <legend>Revisión del catálogo</legend>
+            <label for="pluginAuditFiles">Incluir otros proyectos en la revisión (.mproject)</label>
+            <input id="pluginAuditFiles" type="file" accept=".mproject" multiple>
+            <pre id="pluginReviewSummary" aria-live="polite"></pre>
+            <div class="actions"><button type="button" id="pluginConfirm" disabled>Confirmar cambio</button><button type="button" id="pluginCancel" disabled>Cancelar revisión</button></div>
+          </fieldset>
+          <p id="pluginStatus" role="status" aria-live="polite"></p>
+        </details>
+        <details><summary>Componentes de la pieza</summary>
+          <fieldset id="componentFields" disabled>
+            <label for="pluginPreset">Plantilla de plugin activo</label><select id="pluginPreset" disabled></select>
+            <button type="button" id="pluginApply" disabled>Añadir plantilla a la pieza</button>
+            <label for="componentList">Componente</label><select id="componentList"></select>
+            <label for="componentJson">Registro JSON</label>
+            <textarea id="componentJson" rows="4" maxlength="2048" spellcheck="false" placeholder='{"key":"puerta","version":1,"data":{"abre":true}}'></textarea>
+            <div class="actions"><button type="button" id="componentSave">Guardar componente</button><button type="button" id="componentRemove">Quitar</button></div>
+            <p>Para conservar los componentes, añade o actualiza el borrador en el proyecto y guarda el archivo .mproject.</p>
+          </fieldset>
+        </details>
+      </section>
+      <div class="actions"><button id="undo">↶ Deshacer</button><button id="redo">↷ Rehacer</button></div>
+      <p id="notice" class="notice" role="status"></p><p id="error" class="error" role="alert"></p>
+    </aside>
+  </main>
+  <script src="../web/world.js"></script><script src="../web/starting-content.js"></script><script src="../web/geometry.js"></script><script src="../web/zones.js"></script><script src="../web/view.js"></script><script src="../mundo/drive.js"></script><script src="../mundo/walk.js"></script><script src="../web/meeting.js"></script><script src="preview.js"></script><script src="../web/room-file.js"></script><script src="publications.js"></script><script src="tools.js"></script><script src="../web/circuit.js"></script><script src="../web/component-record.js"></script><script src="../web/project.js"></script><script src="circuit-tools.js"></script><script src="grid-panel.js"></script><script src="circuit-panel.js"></script><script src="project-panel.js"></script><script src="ahead-inspector.js"></script>
+  <script src="../web/experience-look.js"></script>
+  <script src="../web/bruma-look.js"></script>
+  <script src="../web/creator-mesh.js"></script><script src="../web/model-room.js"></script><script src="../web/obj-import.js"></script><script src="creator-assets.js"></script><script src="../web/creator-surface-materials.js"></script><script src="creator-material-panel.js"></script><script src="creator-model-panel.js"></script>
+  <script src="vehicle-model.js"></script>
+  <script src="patio-template.js"></script>
+  <script src="../web/course-timing.js"></script><script src="course-timing-panel.js"></script>
+  <script src="../web/ahead-report.js"></script><script src="ahead-usage-panel.js"></script><script src="district-panel.js"></script><script src="../web/plugin-registry.js"></script><script src="plugin-panel.js"></script><script src="component-inspector.js"></script><script src="../web/npc-routes.js"></script><script src="npc-panel.js"></script><script src="editor.js"></script>
+</body></html>

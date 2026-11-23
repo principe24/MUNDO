@@ -28,11 +28,22 @@ function openRoomSource(filename) {
 
 function byteLimit(filename) {
   const ext=path.extname(filename).toLowerCase();
+  if(ext===".mprojectaudio")return require("../web/audio-project.js").maxBytes;
   return ext===".mroomaudio" ? audioRoom.maxRoomBytes : ext===".mroom3d" ? modelRoom.maxBytes : ext===".mproject" ? 64*1024*1024 : ext===".mroom" ? roomFile.maxBytes : 24*1024*1024;
 }
 
 function readRoomSource(filename, data) {
   if (data.length < 24 || data.length > byteLimit(filename)) throw Error("Tamaño de archivo incompatible.");
+  if(path.extname(filename).toLowerCase()===".mprojectaudio"){
+    const {project,items}=require("../web/audio-project.js").unpack(data);
+    const audioClips=new Map();
+    for(const item of items){
+      if(createHash("sha256").update(item.bytes).digest("hex")!==item.digest)
+        throw Error("La grabación del proyecto no coincide con su huella.");
+      audioClips.set(item.key,item);
+    }
+    return {projectData:Buffer.from(project),audioClips,publication:null};
+  }
   if (path.extname(filename).toLowerCase() === ".mroomaudio") {
     const {room,items}=audioRoom.unpack(data);
     const source=readRoomSource(audioRoom.hasModels(room)?"revision.mroom3d":"revision.mroom",room);

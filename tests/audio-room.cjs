@@ -82,3 +82,51 @@ test("host rejects substituted or unrelated clips, malformed markers, and preser
   await assert.rejects(roomFromSource({bytes:changed,title:"Inválido"}),/audio inválido/);
   assert.equal(sha(items[0].bytes),items[0].digest);
 });
+test("two guests change the available recordings only after both accept the portal",async t=>{
+  const {MundoProject}=require("../server/room-runtime.cjs"),AudioProject=require("../web/audio-project.js");
+  const {courtyard,garden,projectBytes}=require("../examples/navigation/generate.cjs");
+  const a=courtyard(),b=garden();
+  // Only the portal and floor geometry are needed; this example should never write NPC checkpoints.
+  for(const world of [a.world,b.world])for(const n of [...world.nodes.values()])if(n.shape===0)world.nodes.delete(n.id);
+  const media=await Promise.all([.12,.48].map(value=>Clips.prepare(Clips.encodeMono(Float32Array.of(value,-value)))));
+  for(const [i,scene] of [a,b].entries())Scene.add(scene.world,{label:"Voz del lugar",preset:media[i].key,
+    position:[2,1,0],radius:12,volume:.7,group:"voces"});
+  const author=await MundoProject.open(new Blob([await projectBytes(a,b)]));
+  const base=new Uint8Array(await (await MundoProject.packForRoom(author)).arrayBuffer());
+  const bytes=await AudioProject.pack(base,media);
+  const {seats,room,post}=await host(t,"Dos_salas.mprojectaudio",bytes);
+  const travel={"x-mundo-travel":"1","x-mundo-scene":"ready"};
+  const route=(seat,data={})=>post(seat,"route",data,travel).then(async res=>{
+    assert.equal(res.status,200);const frame=Buffer.from(await res.arrayBuffer());return {phase:frame[4],epoch:Number(frame.readBigUInt64LE(5))};
+  });
+  for(const s of seats){
+    const joined=await post(s,"join",{},travel);assert.equal(joined.headers.get("x-mundo-audio-clips"),"wav-1");
+    Object.assign(s,await joined.json(),{seq:0});
+    assert.equal((await post(s,"input",{lease:s.lease,epoch:1,seq:++s.seq,mask:0,jump:false,yaw:0},travel)).status,200);
+  }
+  const start=room.revision;
+  async function clip(seat,revision,key){return post(seat,"audio",{lease:seat.lease,revision,key});}
+  for(const s of seats){
+    assert.equal((await clip(s,start,media[1].key)).status,404);
+    assert.equal((await clip(s,start,media[0].key)).status,200);
+  }
+  const seat=seats[0];let offer;
+  for(let n=0;n<100;n++){
+    const res=await post(seat,"input",{lease:seat.lease,epoch:1,seq:++seat.seq,mask:1,jump:false,yaw:0},travel);
+    assert.ok([200,412].includes(res.status));offer=await route(seat);
+    if(offer.phase===1)break;
+    await new Promise(resolve=>setTimeout(resolve,25));
+  }
+  assert.equal(offer.phase,1,"the player must reach the authored portal");
+  assert.equal((await route(seat,{lease:seat.lease,epoch:offer.epoch,vote:"ready"})).phase,1);
+  assert.equal((await clip(seat,start,media[1].key)).status,404);
+  const other=seats[1];assert.equal((await route(other,{lease:other.lease,epoch:offer.epoch,vote:"ready"})).phase,0);
+  assert.notEqual(room.revision,start);
+  for(const s of seats){
+    assert.equal((await clip(s,start,media[0].key)).status,409);
+    assert.equal((await clip(s,room.revision,media[0].key)).status,404);
+    const actual=await clip(s,room.revision,media[1].key);assert.equal(actual.status,200);
+    assert.equal(sha(Buffer.from(await actual.arrayBuffer())),media[1].digest);
+    assert.equal(await (await post(s,"audio-info",{revision:room.revision})).text(),s.lease+"\n"+media[1].digest+"\n");
+  }
+});

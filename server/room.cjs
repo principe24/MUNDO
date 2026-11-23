@@ -494,7 +494,30 @@ async function roomFromSource(source){
       def.record=records.get(key);
     }
     const flying=[...project.worlds.values()].some(def=>def.startMode==="flying");
-    return makeSession(null,project,new SessionCheckpoint(timingStorageKey(project.hash,flying)));
+    const session=makeSession(null,project,new SessionCheckpoint(timingStorageKey(project.hash,flying)));
+    if(source.audioClips){
+      const {MundoWorld,MundoProject}=require("./room-runtime.cjs"),audioScene=require("../web/audio-scene.js");
+      const guest=await MundoProject.packForRoom(project.index);
+      const header=Buffer.from(await guest.slice(0,80).arrayBuffer());
+      if(guest.size!==source.projectData.length || !header.equals(source.projectData.subarray(0,80)))
+        throw Error("Utiliza la exportación del proyecto para invitados con grabaciones.");
+
+      const referenced=new Set();
+      session.audioByRevision=new Map();
+      for(const def of project.worlds.values()){
+        const clips=new Map();
+        for(const marker of audioScene.read(MundoWorld.decode(def.bytes))){
+          if(!audioScene.isClip(marker.preset))continue;
+          const item=source.audioClips.get(marker.preset);
+          if(!item)throw Error("Falta una grabación de un mundo del proyecto.");
+          clips.set(item.key,item);referenced.add(item.key);
+        }
+        session.audioByRevision.set(def.revision,clips);
+      }
+      if(referenced.size!==source.audioClips.size)throw Error("Hay grabaciones ajenas al proyecto.");
+      session.audioClips=source.audioClips;
+    }
+    return session;
   }
   const hash=source.publicationHash??createHash("sha256").update(source.bytes).digest("hex");
   const single=ordinary(source.bytes,source.title,source.vehicleRoot,source.meetingPoint,null);
@@ -516,7 +539,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
   const actorPackage=shareInes===true?require("./room-actor.cjs").inesPackage():null;
   const brumaPackage=shareBruma===true?require("./bruma-package.cjs").readBruma():null;
   const modelRevision=creatorModels?.size && !room.project ? room.revision : null;
-  const audioRevision=room.audioClips?.size && !room.project ? room.revision : null;
+  const offersRecordings=Boolean(room.audioClips?.size);
   const entries=new EntryDelivery(room);
   const sectors=new SectorDelivery(room,entries.zones);
   const assets=new Map(files.map(file=>{
@@ -605,7 +628,7 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
       if(url==="/room/leave"){room.leave(live);return send(200,"{}");}
       if(url==="/room/join"){
         if(req.headers["x-mundo-scene"]==="loading")p.scene="loading";
-        if(audioRevision)res.setHeader("x-mundo-audio-clips","wav-1");
+        if(offersRecordings)res.setHeader("x-mundo-audio-clips","wav-1");
         if(actorPackage)res.setHeader("x-mundo-actor","ines-bajamar-1");
         if(modelRevision)res.setHeader("x-mundo-creator-models","mesh-1");
         if(brumaPackage)res.setHeader("x-mundo-car-art","bruma-1");
@@ -628,17 +651,19 @@ function createHost(room,{host="127.0.0.1",port=8787,tls=null,advertisedOrigin=n
         return send(200,actorPackage,"application/octet-stream");
       }
       if(url==="/room/audio-info" || url==="/room/audio"){
-        if(!audioRevision)return send(url==="/room/audio-info"?204:404,"");
+        if(!offersRecordings)return send(url==="/room/audio-info"?204:404,"");
         if(!data || typeof data!=="object" || Array.isArray(data))fail(400,"Solicitud de sonido inválida.");
-        if(data.revision!==audioRevision || room.revision!==audioRevision)fail(409,"La revisión de audio cambió.");
+        if(data.revision!==room.revision)fail(409,"La revisión de audio cambió.");
+        const clips=room.project ? room.audioByRevision.get(room.revision) : room.audioClips;
         if(url==="/room/audio-info"){
           if(Object.keys(data).length!==1)fail(400,"Solicitud de catálogo inválida.");
-          const hashes=[...room.audioClips.values()].map(item=>item.digest);
+          if(!clips?.size)return send(204,"");
+          const hashes=[...clips.values()].map(item=>item.digest);
           return send(200,[p.lease,...hashes].join("\n")+"\n","text/plain");
         }
         if(Object.keys(data).length!==3 || data.lease!==p.lease)fail(403,"La reserva de la plaza cambió.");
         if(typeof data.key!=="string" || !/^s[0-9a-f]{16}$/.test(data.key))fail(400,"Clave de sonido inválida.");
-        const item=room.audioClips.get(data.key);
+        const item=clips?.get(data.key);
         if(!item)fail(404,"Esta grabación no pertenece a la sala.");
         const now=performance.now(),burst=8*1024*1024;
         meter.audioBytes=Math.min(burst,(meter.audioBytes??burst)+(now-(meter.audioAt??now))*1024);

@@ -247,12 +247,35 @@ function createNavigation(objects, profile = {}) {
       const start = projectInner(from,moving,spend), goal = projectInner(to,moving,spend);
       if (!start || !goal) return failure("unreachable");
       const distance = (x,z) => Math.hypot(x-goal[0],z-goal[2]);
+      const totalDistance = distance(start[0],start[2]);
+      if (totalDistance > MAX_SPAN) {
+        // Direct visibility on open terrain can cover kilometres. Return the
+        // exact checked segments so an NPC can revalidate them as doors move.
+        const segments = Math.ceil(totalDistance/(MAX_SPAN/2));
+        if (segments <= 512) {
+          const points = [start];
+          for (let i=1; i<=segments; ++i) {
+            const t=i/segments;
+            const x=i===segments ? goal[0] : start[0]+(goal[0]-start[0])*t;
+            const z=i===segments ? goal[2] : start[2]+(goal[2]-start[2])*t;
+            const end=sweep(points.at(-1),x,z,moving,spend);
+            if (!end) break;
+            points.push(end);
+          }
+          if (points.length===segments+1 && Math.abs(points.at(-1)[1]-goal[1])<=EPS)
+            return {status:"ok",points,visited:1};
+        }
+      }
+      // Slightly favour progress on long journeys, where many open-ground
+      // candidates have indistinguishable lower bounds. Paths need to be safe;
+      // the controller does not require a provably shortest travel distance.
+      const heuristicWeight = totalDistance > MAX_SPAN ? 1.12 : 1;
       const frontier = new Frontier(), costs = new Map();
       function enqueue(i,j,feet,cost,parent) {
         const key = i + "," + j + "," + feet[1];
         if ((costs.get(key) ?? Infinity) <= cost+EPS) return;
         costs.set(key,cost);
-        frontier.push({key,i,j,feet,cost,parent,priority:cost+distance(feet[0],feet[2])});
+        frontier.push({key,i,j,feet,cost,parent,priority:cost+heuristicWeight*distance(feet[0],feet[2])});
       }
       enqueue(0,0,start,0,null);
       while (frontier.items.length) {
@@ -270,7 +293,17 @@ function createNavigation(objects, profile = {}) {
             return {status:"ok",points:points.reverse(),visited};
           }
         }
-        for (const [di,dj] of directions) {
+        const moves = directions.slice();
+        // Keep the ordinary eight neighbours when a shortcut is blocked.
+        // A collision-checked lattice shortcut traverses open stretches on
+        // either side of a distant obstacle without expanding every cell.
+        const remaining = distance(p[0],p[2]);
+        if (totalDistance > MAX_SPAN && remaining > 3*cell) {
+          const stride = Math.min(remaining,MAX_SPAN/2);
+          moves.push([Math.round((goal[0]-p[0])*stride/(remaining*cell)),
+                      Math.round((goal[2]-p[2])*stride/(remaining*cell))]);
+        }
+        for (const [di,dj] of moves) {
           const i = node.i+di, j = node.j+dj;
           const x = start[0]+i*cell, z = start[2]+j*cell;
           if (Math.abs(x)>RANGE || Math.abs(z)>RANGE) continue;

@@ -94,3 +94,26 @@ test("large ground does not require a dense map; bounded searches distinguish ex
   const dense=createNavigation(Array(6000).fill(platform));
   assert.equal(dense.plan([0,0,0],[1,0,1],{maxNodes:1}).status,"budget");
 });
+test("a kilometre-long open route uses bounded, continuously validated segments",()=>{
+  const nav=createNavigation([floor(-1010,-10,1010,20)]);
+  const route=nav.plan([-531,0,2],[654,.1,9],{maxNodes:16});
+  assert.equal(route.status,"ok");
+  assert.equal(route.visited,1);
+  assert.ok(route.points.length>30);
+  for(let i=1;i<route.points.length;i++) {
+    const a=route.points[i-1], b=route.points[i];
+    assert.ok(Math.hypot(a[0]-b[0],a[2]-b[2])<=32);
+    assert.equal(nav.canTraverse(a,b),true);
+  }
+});
+test("long corridors detour around an interior wall and never cross a sealed barrier",()=>{
+  const floorBox=floor(-200,-5,200,5);
+  const a=[-140,0,0],b=[128,0,0];
+  const detour=createNavigation([floorBox,box([.01,0,-2],[.02,4,2])]);
+  const route=assertRoute(detour,a,b,{maxNodes:600});
+  assert.ok(route.points.some(p=>Math.abs(p[2])>2.28));
+  const closed=createNavigation([floorBox,box([.01,0,-5],[.02,4,5])]);
+  const rejected=closed.plan(a,b,{maxNodes:600});
+  assert.notEqual(rejected.status,"ok");
+  assert.deepEqual(rejected.points,[]);
+});

@@ -30,9 +30,9 @@ function garden() {
   const portal = box(world, "Portal/Patio", [0, .06, 2], [2.5, .12, 1.5], [.12, .64, .65]);
   // The high ID also exercises transfer of full unsigned 64-bit IDs through the browser protocol.
   world.next = 9007199254741001n;
-  const start = [-5, 0, -1];
-  const route = routes.addRoute(world, "Paseo del jardín", [start, [-5, 0, -6]]);
-  const npc = routes.addNpc(world, {label:"Guía del jardín", route, mode:"patrol",
+  const start = [4, 0, 7];
+  const route = routes.addRoute(world, "Encuentro del jardín", [start]);
+  const npc = routes.addNpc(world, {label:"Guía del jardín", route, mode:"follow",
     speed:1.5, waitSeconds:1, spawn:start});
   return {world, portal, npc};
 }

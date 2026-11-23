@@ -57,9 +57,9 @@ async function setup(t) {
   function client(seat) {
     const ticket = {invite:seat.invite, proof:randomBytes(24).toString("hex")};
     let seq = 0, lease, epoch = 1;
-    async function post(endpoint, data, {binary=false, npcs=false, invite=ticket.invite} = {}) {
+    async function post(endpoint, data, {binary=false, npcs=false, invite=ticket.invite, scene="ready"} = {}) {
       const headers = {origin, "content-type":"application/json", "x-invite":invite, "x-seat":ticket.proof,
-        "x-mundo-room-version":"3", "x-mundo-scene":"ready", "x-mundo-travel":"1"};
+        "x-mundo-room-version":"3", "x-mundo-scene":scene, "x-mundo-travel":"1"};
       if (binary) headers.accept = mediaTypeV3;
       if (npcs) headers["x-mundo-npcs"] = "1";
       return fetch(origin + "/room/" + endpoint,
@@ -176,6 +176,19 @@ test("two votes switch the NPC population atomically and stale epochs cannot mov
   assert.ok(second.npc > BigInt(Number.MAX_SAFE_INTEGER));
   assert.equal(arrived[0].id, String(second.npc));
   assert.deepEqual(readEnvelope(await b.state(0, binaryOptions)).npcs, arrived);
+  const home = arrived[0].position;
+  tick(14);
+  const following = (await a.state()).npcs[0];
+  assert.equal(following.state, "follow");
+  assert.ok(Math.hypot(...following.position.map((coord,i) => coord-home[i])) >= .5);
+  const idle = {npcs:true, scene:"idle"};
+  await a.state(0, idle); await b.state(0, idle);
+  tick(2);
+  assert.equal((await a.state(0, idle)).npcs[0].state, "return");
+  tick(32);
+  const returned = (await b.state(0, idle)).npcs[0];
+  assert.equal(returned.state, "idle");
+  assert.deepEqual(returned.position, home);
 });
 
 test("an empty room suspends its patrol and the next observer resumes the saved position", async t => {

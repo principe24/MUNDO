@@ -1,6 +1,6 @@
 # Los dos patios
 
-Abre `Los_dos_patios.mproject` en MUNDO Studio para editar las dos salas. El guía del patio camina entre dos puntos separados por un muro, espera en cada extremo y regresa. La baldosa turquesa conecta con el jardín, que tiene su propio guía y recorrido.
+Abre `Los_dos_patios.mproject` en MUNDO Studio para editar las dos salas. El guía del patio camina entre dos puntos separados por un muro, espera en cada extremo y regresa. La baldosa turquesa conecta con el jardín, donde otro guía se acerca a un visitante, se detiene a su lado y vuelve a su punto de encuentro cuando deja de tener un visitante a quien seguir.
 
 Para jugar en el equipo anfitrión, desde la raíz del motor ejecuta lo siguiente.
 

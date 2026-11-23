@@ -193,7 +193,7 @@ Response Http::post(std::string_view action, std::string_view json, std::size_t 
         request.HTTPBody = [NSData dataWithBytes:json.data() length:json.size()];
         request.timeoutInterval = statusOnly ? 1 : 4;
         [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-        NSString *accept = action == "meeting" ? @"text/plain" :
+        NSString *accept = action == "audio" ? @"audio/wav" : (action == "meeting" || action == "audio-info") ? @"text/plain" :
             (action == "route" || fragment_limit) ? @"application/octet-stream" : @"application/vnd.mundo.room-v3";
         [request setValue:accept forHTTPHeaderField:@"Accept"];
         [request setValue:@"1" forHTTPHeaderField:@"X-Mundo-Travel"];

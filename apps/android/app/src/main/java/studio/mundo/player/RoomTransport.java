@@ -80,7 +80,8 @@ final class RoomTransport {
                     action.equals("sector-ahead") || action.equals("sector-ahead-part") ||
                     action.equals("sector-ready") || action.equals("sector-full") || usage ||
                     action.equals("cell-index") || action.equals("route");
-            String accept = action.equals("meeting") ? "text/plain" : binaryPart ? "application/octet-stream" : wire;
+            String accept = action.equals("audio") ? "audio/wav" :
+                    (action.equals("meeting") || action.equals("audio-info")) ? "text/plain" : binaryPart ? "application/octet-stream" : wire;
             request.setRequestProperty("Accept", accept);
             request.setRequestProperty("X-Mundo-Travel", "1");
             request.setRequestProperty("X-Mundo-Circuit", "1");

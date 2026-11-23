@@ -89,7 +89,9 @@ Response Http::post(std::string_view action, std::string_view json, std::size_t 
     const auto fragment_limit = room_fragment_limit(action);
     if (fragment_limit && max_bytes > *fragment_limit) max_bytes = *fragment_limit;
     const wchar_t* path;
-    if (action == "join") path = L"/room/join";
+    if (action == "audio") path = L"/room/audio";
+    else if (action == "audio-info") path = L"/room/audio-info";
+    else if (action == "join") path = L"/room/join";
     else if (action == "world") path = L"/room/world";
     else if (action == "world-part") path = L"/room/world-part";
     else if (action == "world-rest") path = L"/room/world-rest";
@@ -110,7 +112,7 @@ Response Http::post(std::string_view action, std::string_view json, std::size_t 
     else if (action == "leave") path = L"/room/leave";
     else return {};
 
-    const wchar_t* accept[] = {action == "meeting" ? L"text/plain" :
+    const wchar_t* accept[] = {action == "audio" ? L"audio/wav" : (action == "meeting" || action == "audio-info") ? L"text/plain" :
         (action == "route" || fragment_limit) ? L"application/octet-stream" : wire_media, nullptr};
     const DWORD flags = impl_->tls ? WINHTTP_FLAG_SECURE : 0;
     Internet request(WinHttpOpenRequest(impl_->connection.get(), L"POST", path, nullptr,

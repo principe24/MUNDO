@@ -483,8 +483,6 @@ void update_room(Player& p, Clock::time_point now) {
         if(installed){
             play.scene.install(state,play.actors);
             play.audio.install(play.scene.world(), true);
-            for (const auto& clip : state.audio_clips)
-                play.audio.install_clip(clip.key, std::as_bytes(std::span(clip.bytes)));
             play.course_caption.clear();
             play.next_course_guide={};
             neutral_controls(p);
@@ -495,6 +493,8 @@ void update_room(Player& p, Clock::time_point now) {
             play.audio.install(play.scene.world(), false);
             p.surface->trim_on_next_scene();
         }
+        for (const auto& clip : state.audio_clips)
+            play.audio.install_clip(clip.key, std::as_bytes(std::span(clip.bytes)));
         if (installed || state.region) state.confirm_install();
         if(state.snapshot){
             const bool snap=state.meeting_returned || state.phase!=play.phase;

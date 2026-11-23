@@ -60,12 +60,17 @@ inline constexpr std::size_t sector_ahead_reply_limit = 80u + 9u * 48u;
 inline constexpr std::size_t sector_ack_reply_limit = 0;
 inline constexpr std::size_t sector_full_reply_limit = 16;
 
+inline constexpr std::size_t audio_info_reply_limit = 33 + 16 * 65;
+inline constexpr std::size_t audio_clip_reply_limit = 44 + 2 * 24000 * 16;
+
 constexpr bool is_usage_report(std::string_view action) {
     return action == "sector-usage" || action == "sector-usage-stages";
 }
 
 // sector-full issues a binary challenge on 200 and acknowledges its return with 204.
 constexpr std::optional<std::size_t> room_fragment_limit(std::string_view action) {
+    if (action == "audio-info") return audio_info_reply_limit;
+    if (action == "audio") return audio_clip_reply_limit;
     if (action == "entry-info") return entry_info_reply_size;
     if (action == "cell-index") return cell_index_reply_limit;
     if (action == "sector-plan") return sector_plan_reply_limit;

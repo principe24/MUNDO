@@ -1,4 +1,5 @@
 #include "room_client.hpp"
+#include "audio_transfer.hpp"
 #include "room_http.hpp"
 #include "sector_stream.hpp"
 #include "usage_reports.hpp"
@@ -903,6 +904,7 @@ std::optional<std::vector<std::byte>> download_world(Http& http, Download& downl
 }
 
 struct Connection {
+    AudioTransfer audio;
     std::optional<Join> admission;
     bool world_delivered{};
     std::optional<World> world;
@@ -1774,10 +1776,19 @@ struct Client::Impl {
         return latest;
     }
 
-    void publish(Connection& session, Snapshot snapshot, CancelToken stop, std::uint64_t epoch) {
+    void publish(Connection& session, Snapshot snapshot, const Request& request, std::uint64_t epoch) {
+        const auto& stop = request.stop;
+        const bool new_audio = !session.world_delivered && !session.same_world_swap && session.world;
+        auto keys = new_audio ? required_clips(*session.world) : std::vector<std::string>{};
         std::lock_guard lock(mutex);
         if (stop.stop_requested() || !foreground || suspension_epoch != epoch) return;
         clear_entry();
+        if (new_audio) {
+            const auto& revision = session.route ? session.route->scene.revision : session.admission->revision;
+            display.audio_clips.clear();
+            session.audio.select(request.invite, request.proof, revision, std::move(keys));
+        }
+        if (auto clips = session.audio.poll(); !clips.empty()) display.audio_clips = std::move(clips);
         display.seat = session.admission->id;
         display.title = session.admission->name;
         last_snapshot = Clock::now();
@@ -1995,7 +2006,7 @@ struct Client::Impl {
                     session.ahead.discard();
                     set_phase(stop, Phase::reconnecting, "Actualizando tu posición con el anfitrión…");
                 } else if (present) {
-                    publish(session, std::move(snapshot), stop, epoch);
+                    publish(session, std::move(snapshot), request, epoch);
                 } else {
                     set_phase(stop, Phase::reconnecting, "Preparando el terreno alrededor de tu posición…");
                 }
@@ -2252,6 +2263,7 @@ Update Client::poll(bool constrained) {
             std::exchange(current.meeting_notice, {}), std::exchange(current.meeting_returned, false)};
     update.region = std::exchange(current.region, std::nullopt);
     update.usage = std::move(current.usage);
+    update.audio_clips = std::exchange(current.audio_clips, {});
     return update;
 }
 

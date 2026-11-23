@@ -29,7 +29,6 @@ public:
         std::lock_guard guard(mutex_);
         if (new_session || !scene) {
             mixer_.reset();
-            mixer_.clear_clips();
         }
         enabled_ = scene && mixer_.set_scene(*scene) && mixer_.has_sources();
     }

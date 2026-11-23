@@ -26,6 +26,10 @@ struct RegionUpdate {
     CharacterTerrain terrain;
 };
 
+struct RoomAudioClip {
+    std::string key;
+    std::vector<std::byte> bytes;
+};
 struct RegionUsage;
 struct Update {
     Phase phase{Phase::offline};
@@ -48,6 +52,7 @@ struct Update {
     // Replaces static scenery within the same world. Keep actors and camera state.
     std::optional<RegionUpdate> region;
     std::shared_ptr<RegionUsage> usage;
+    std::vector<RoomAudioClip> audio_clips; // May follow the full scene in a later playing update.
     // Called on the render thread only after the matching geometry was installed.
     void confirm_install() noexcept;
 };

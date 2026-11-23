@@ -162,8 +162,6 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
             play.title = state.title;
             play.scene.install(state,play.actors);
             play.audio.install(play.scene.world(), true);
-            for (const auto& clip : state.audio_clips)
-                play.audio.install_clip(clip.key, std::as_bytes(std::span(clip.bytes)));
             pause();
             play.look.yaw=0.;play.look.pitch=0.;
         }
@@ -172,6 +170,8 @@ bool Session::draw_room(double now, double elapsed, const DisplayCaps& caps) {
             play.audio.install(play.scene.world(), false);
             surface_->trim_on_next_scene();
         }
+        for (const auto& clip : state.audio_clips)
+            play.audio.install_clip(clip.key, std::as_bytes(std::span(clip.bytes)));
         if (installed || state.region) state.confirm_install();
         const auto previous_ticket = meeting_ticket();
         const bool changed = play.phase != state.phase;
